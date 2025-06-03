@@ -28,7 +28,7 @@ export class CameraControls {
         this.isPointerLocked = false;
         
         // Collision boundaries - updated for massive scale
-        this.roomBoundary = 380;     // Room walls  
+        this.roomBoundary = 460;     // Increased from 380 to allow closer to walls
         this.poolBoundary = 180;     // Pool edges (400/2 - 20 for safety)
         this.poolDepth = -18;        // Pool bottom
         this.floorLevel = 5;         // Walking height (taller for scale)

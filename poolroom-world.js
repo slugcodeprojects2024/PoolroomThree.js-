@@ -25,6 +25,7 @@ export class PoolroomWorld {
         
         await this.loadTextures(); // Load textures first
         this.createTexturedMaterials();
+        this.createBasicSkybox();      // Add skybox early
         this.createBasicFloor();
         this.createBasicWalls();
         this.createBasicCeiling();
@@ -294,93 +295,162 @@ export class PoolroomWorld {
     }
     
     createBasicWalls() {
-        // Four simple walls
-        const wallHeight = this.wallHeight;
+        // Create a simple tile texture - just a white square with black border
+        const canvas = document.createElement('canvas');
+        canvas.width = 32;
+        canvas.height = 32;
+        const ctx = canvas.getContext('2d');
+        
+        // White tile - EXACT SAME AS FLOOR
+        ctx.fillStyle = '#f5f5f0';
+        ctx.fillRect(0, 0, 32, 32);
+        
+        // Thin black border - EXACT SAME AS FLOOR
+        ctx.strokeStyle = '#cccccc';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(0, 0, 32, 32);
+        
+        const tileTexture = new THREE.CanvasTexture(canvas);
+        tileTexture.wrapS = THREE.RepeatWrapping;
+        tileTexture.wrapT = THREE.RepeatWrapping;
+        tileTexture.magFilter = THREE.NearestFilter;
+        tileTexture.minFilter = THREE.NearestFilter;
+        
         const roomSize = this.roomSize;
+        const wallHeight = this.wallHeight;
+        const tileSize = 2.5; // Same as floor tiles
         
-        // North wall
-        const northWall = new THREE.Mesh(
-            new THREE.PlaneGeometry(roomSize, wallHeight),
-            this.materials.wall
-        );
-        northWall.position.set(0, wallHeight/2, -roomSize/2);
-        this.architectureGroup.add(northWall);
+        // Create 4 walls - move them closer to room center to fix collision
+        const wallOffset = 2; // Move walls 2 units inward
+        const walls = [
+            // North wall
+            {
+                geometry: new THREE.PlaneGeometry(roomSize, wallHeight),
+                position: [0, wallHeight/2, -roomSize/2 + wallOffset],
+                rotation: [0, 0, 0]
+            },
+            // South wall  
+            {
+                geometry: new THREE.PlaneGeometry(roomSize, wallHeight),
+                position: [0, wallHeight/2, roomSize/2 - wallOffset],
+                rotation: [0, Math.PI, 0]
+            },
+            // East wall
+            {
+                geometry: new THREE.PlaneGeometry(roomSize, wallHeight),
+                position: [roomSize/2 - wallOffset, wallHeight/2, 0],
+                rotation: [0, -Math.PI/2, 0]
+            },
+            // West wall
+            {
+                geometry: new THREE.PlaneGeometry(roomSize, wallHeight),
+                position: [-roomSize/2 + wallOffset, wallHeight/2, 0],
+                rotation: [0, Math.PI/2, 0]
+            }
+        ];
         
-        // South wall
-        const southWall = new THREE.Mesh(
-            new THREE.PlaneGeometry(roomSize, wallHeight),
-            this.materials.wall
-        );
-        southWall.position.set(0, wallHeight/2, roomSize/2);
-        southWall.rotation.y = Math.PI;
-        this.architectureGroup.add(southWall);
+        walls.forEach((wallData, index) => {
+            // Same material as floor but with moderate emissive 
+            const material = new THREE.MeshLambertMaterial({
+                map: tileTexture.clone(),
+                emissive: 0x606060  // Middle ground between 0x404040 and 0x808080
+            });
+            
+            const wall = new THREE.Mesh(wallData.geometry, material);
+            wall.position.set(...wallData.position);
+            wall.rotation.set(...wallData.rotation);
+            
+            // Set tile repeat for walls
+            const repeatX = roomSize / tileSize;
+            const repeatY = wallHeight / tileSize;
+            
+            wall.material.map.repeat.set(repeatX, repeatY);
+            wall.material.map.needsUpdate = true;
+            
+            this.architectureGroup.add(wall);
+        });
         
-        // East wall
-        const eastWall = new THREE.Mesh(
-            new THREE.PlaneGeometry(roomSize, wallHeight),
-            this.materials.wall
-        );
-        eastWall.position.set(roomSize/2, wallHeight/2, 0);
-        eastWall.rotation.y = -Math.PI/2;
-        this.architectureGroup.add(eastWall);
-        
-        // West wall
-        const westWall = new THREE.Mesh(
-            new THREE.PlaneGeometry(roomSize, wallHeight),
-            this.materials.wall
-        );
-        westWall.position.set(-roomSize/2, wallHeight/2, 0);
-        westWall.rotation.y = Math.PI/2;
-        this.architectureGroup.add(westWall);
-        
-        console.log('Basic walls created');
+        console.log('Walls with moderate emissive lighting');
     }
     
     createBasicCeiling() {
-        // Simple ceiling with square opening in center
+        // Create the same tile texture
+        const canvas = document.createElement('canvas');
+        canvas.width = 32;
+        canvas.height = 32;
+        const ctx = canvas.getContext('2d');
+        
+        // White tile - same as floor
+        ctx.fillStyle = '#f5f5f0';
+        ctx.fillRect(0, 0, 32, 32);
+        
+        // Thin black border
+        ctx.strokeStyle = '#cccccc';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(0, 0, 32, 32);
+        
+        const tileTexture = new THREE.CanvasTexture(canvas);
+        tileTexture.wrapS = THREE.RepeatWrapping;
+        tileTexture.wrapT = THREE.RepeatWrapping;
+        tileTexture.magFilter = THREE.NearestFilter;
+        tileTexture.minFilter = THREE.NearestFilter;
+        
+        const ceilingMaterial = new THREE.MeshLambertMaterial({
+            map: tileTexture
+        });
+        
         const ceilingY = this.wallHeight;
         const openingSize = this.openingSize;
         const roomSize = this.roomSize;
+        const tileSize = 2.5;
         
         // Four ceiling sections around the opening
         
         // North section
         const northCeiling = new THREE.Mesh(
             new THREE.PlaneGeometry(roomSize, (roomSize - openingSize) / 2),
-            this.materials.wall
+            ceilingMaterial.clone()
         );
         northCeiling.rotation.x = Math.PI / 2;
         northCeiling.position.set(0, ceilingY, -roomSize/4 - openingSize/4);
+        northCeiling.material.map.repeat.set(roomSize / tileSize, ((roomSize - openingSize) / 2) / tileSize);
+        northCeiling.material.map.needsUpdate = true;
         this.architectureGroup.add(northCeiling);
         
         // South section
         const southCeiling = new THREE.Mesh(
             new THREE.PlaneGeometry(roomSize, (roomSize - openingSize) / 2),
-            this.materials.wall
+            ceilingMaterial.clone()
         );
         southCeiling.rotation.x = Math.PI / 2;
         southCeiling.position.set(0, ceilingY, roomSize/4 + openingSize/4);
+        southCeiling.material.map.repeat.set(roomSize / tileSize, ((roomSize - openingSize) / 2) / tileSize);
+        southCeiling.material.map.needsUpdate = true;
         this.architectureGroup.add(southCeiling);
         
         // East section
         const eastCeiling = new THREE.Mesh(
             new THREE.PlaneGeometry((roomSize - openingSize) / 2, openingSize),
-            this.materials.wall
+            ceilingMaterial.clone()
         );
         eastCeiling.rotation.x = Math.PI / 2;
         eastCeiling.position.set(roomSize/4 + openingSize/4, ceilingY, 0);
+        eastCeiling.material.map.repeat.set(((roomSize - openingSize) / 2) / tileSize, openingSize / tileSize);
+        eastCeiling.material.map.needsUpdate = true;
         this.architectureGroup.add(eastCeiling);
         
         // West section
         const westCeiling = new THREE.Mesh(
             new THREE.PlaneGeometry((roomSize - openingSize) / 2, openingSize),
-            this.materials.wall
+            ceilingMaterial.clone()
         );
         westCeiling.rotation.x = Math.PI / 2;
         westCeiling.position.set(-roomSize/4 - openingSize/4, ceilingY, 0);
+        westCeiling.material.map.repeat.set(((roomSize - openingSize) / 2) / tileSize, openingSize / tileSize);
+        westCeiling.material.map.needsUpdate = true;
         this.architectureGroup.add(westCeiling);
         
-        console.log('Basic ceiling with opening created');
+        console.log('Tiled ceiling with opening created');
     }
     
     createBasicPool() {
@@ -497,7 +567,7 @@ export class PoolroomWorld {
         const skyMaterial = new THREE.MeshBasicMaterial({
             color: 0x87ceeb,
             transparent: true,
-            opacity: 0.7
+            opacity: 0.1  // Much more transparent to show skybox behind
         });
         
         // Create openings on each wall
@@ -540,6 +610,54 @@ export class PoolroomWorld {
         });
         
         console.log('Floor-to-ceiling wall openings created');
+    }
+    
+    createBasicSkybox() {
+        // Create a large sphere that surrounds the entire scene
+        const skyboxGeometry = new THREE.SphereGeometry(1500, 32, 32); // Much larger than room
+        
+        // Create a simple gradient sky material
+        const canvas = document.createElement('canvas');
+        canvas.width = 512;
+        canvas.height = 512;
+        const ctx = canvas.getContext('2d');
+        
+        // Create vertical gradient from light blue to white
+        const gradient = ctx.createLinearGradient(0, 0, 0, 512);
+        gradient.addColorStop(0, '#87CEEB');    // Sky blue at top
+        gradient.addColorStop(0.7, '#B0E0E6');  // Powder blue
+        gradient.addColorStop(1, '#F0F8FF');    // Alice blue at horizon
+        
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, 512, 512);
+        
+        // Add some simple cloud-like texture
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+        for (let i = 0; i < 20; i++) {
+            const x = Math.random() * 512;
+            const y = Math.random() * 256; // Only in upper half
+            const radius = 20 + Math.random() * 40;
+            ctx.beginPath();
+            ctx.arc(x, y, radius, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        
+        const skyTexture = new THREE.CanvasTexture(canvas);
+        skyTexture.wrapS = THREE.RepeatWrapping;
+        skyTexture.wrapT = THREE.RepeatWrapping;
+        
+        const skyboxMaterial = new THREE.MeshBasicMaterial({
+            map: skyTexture,
+            side: THREE.BackSide, // Render on inside of sphere
+            fog: false // Don't apply fog to skybox
+        });
+        
+        this.skybox = new THREE.Mesh(skyboxGeometry, skyboxMaterial);
+        this.skybox.position.y = 200; // Lift it up a bit
+        
+        this.scene.add(this.skybox);
+        
+        console.log('🌤️ Basic gradient skybox with clouds created');
     }
     
     // Simple getters
