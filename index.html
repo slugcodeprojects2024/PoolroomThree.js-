@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Poolrooms - Assignment 5: Three.js</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background: #000;
+            font-family: Arial, sans-serif;
+        }
+        
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
+        }
+        
+        #ui-overlay {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 14px;
+            line-height: 1.4;
+            max-width: 300px;
+            z-index: 100;
+        }
+        
+        #crosshair {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 20px;
+            height: 20px;
+            pointer-events: none;
+            z-index: 50;
+        }
+        
+        #crosshair::before,
+        #crosshair::after {
+            content: "";
+            position: absolute;
+            background-color: rgba(255, 255, 255, 0.8);
+        }
+        
+        #crosshair::before {
+            width: 100%;
+            height: 2px;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+        
+        #crosshair::after {
+            width: 2px;
+            height: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+        
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 24px;
+            text-align: center;
+            z-index: 200;
+        }
+
+        #collectibles-ui {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            color: white;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 14px;
+            z-index: 100;
+        }
+    </style>
+</head>
+<body>
+    <div id="loading">
+        <div>🏊‍♂️ Loading Poolrooms...</div>
+        <div style="font-size: 16px; margin-top: 10px;">Assignment 5: Three.js Implementation</div>
+    </div>
+    
+    <div id="canvas-container"></div>
+    
+    <div id="crosshair"></div>
+    
+    <div id="ui-overlay">
+        <h3 style="margin-top: 0; color: #00ffff;">🏊‍♂️ Poolrooms - Phase 1</h3>
+        <div id="status">Initializing...</div>
+        <hr style="margin: 10px 0; border: 1px solid #333;">
+        <div style="font-size: 12px; color: #ccc;">
+            <strong>Controls:</strong><br>
+            • WASD - Move<br>
+            • Mouse - Look around<br>
+            • Click to lock cursor<br>
+            • ESC to unlock cursor
+        </div>
+    </div>
+
+    <div id="collectibles-ui">
+        <div id="collectibles-counter">Collectibles: 0/10</div>
+    </div>
+
+    <!-- Three.js CDN - GitHub Pages friendly -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    
+    <!-- Load our modular components -->
+    <script type="module" src="main.js"></script>
+</body>
+</html>
