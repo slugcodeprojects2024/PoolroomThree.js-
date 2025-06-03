@@ -1,4 +1,4 @@
-// camera-controls.js - First Person Camera Controls for Poolrooms
+// camera-controls.js - Enhanced with stair and pillar collision
 export class CameraControls {
     constructor(camera, domElement) {
         this.camera = camera;
@@ -28,11 +28,27 @@ export class CameraControls {
         this.isPointerLocked = false;
         
         // Collision boundaries - updated for massive scale
-        this.roomBoundary = 460;     // Increased from 380 to allow closer to walls
-        this.poolBoundary = 180;     // Pool edges (400/2 - 20 for safety)
+        this.roomBoundary = 460;     // Room walls
+        this.poolBoundary = 180;     // Pool edges
         this.poolDepth = -18;        // Pool bottom
-        this.floorLevel = 5;         // Walking height (taller for scale)
+        this.floorLevel = 5;         // Walking height
         this.waterLevel = -1;        // Water surface
+        this.playerRadius = 20;      // Player collision radius
+        
+        // Stair collision data (from poolroom-world.js)
+        this.stairPositions = [
+            { x: -350, z: -350, name: 'northwest' },
+            { x: 350, z: -350, name: 'northeast' }
+        ];
+        
+        // Pillar collision data
+        this.pillarPositions = [
+            { x: -200, z: -200 },
+            { x: 200, z: -200 },
+            { x: -200, z: 200 },
+            { x: 200, z: 200 }
+        ];
+        this.pillarRadius = 25; // Pillar collision radius
         
         // Water physics
         this.waterDamping = 15.0;
@@ -42,7 +58,7 @@ export class CameraControls {
     init() {
         this.setupPointerLock();
         this.setupKeyboardControls();
-        console.log('🎮 Camera controls initialized');
+        console.log('🎮 Camera controls initialized with enhanced collision');
     }
     
     setupPointerLock() {
@@ -56,22 +72,26 @@ export class CameraControls {
             this.isPointerLocked = document.pointerLockElement === this.domElement;
         });
         
-        // Handle mouse movement
+        // Handle mouse movement - EXPLICIT EULER ANGLES
         document.addEventListener('mousemove', (event) => {
             if (!this.isPointerLocked) return;
             
-            const movementX = event.movementX || 0;
-            const movementY = event.movementY || 0;
+            const mouseX = event.movementX || 0;
+            const mouseY = event.movementY || 0;
             
-            // Update camera rotation - FIXED DIRECTION
-            this.camera.rotation.y -= movementX * this.mouseSensitivity;  // Correct horizontal
-            this.camera.rotation.x -= movementY * this.mouseSensitivity;  // Correct vertical
+            // Get current rotation as Euler angles
+            const euler = new THREE.Euler().setFromQuaternion(this.camera.quaternion, 'YXZ');
             
-            // Limit vertical rotation
-            this.camera.rotation.x = Math.max(
-                -Math.PI / 2, 
-                Math.min(Math.PI / 2, this.camera.rotation.x)
-            );
+            // Update rotations
+            euler.y -= mouseX * this.mouseSensitivity;  // Horizontal look
+            euler.x -= mouseY * this.mouseSensitivity;  // Vertical look
+            euler.z = 0; // Force Z rotation to always be 0
+            
+            // Clamp vertical look
+            euler.x = Math.max(-Math.PI/2, Math.min(Math.PI/2, euler.x));
+            
+            // Apply back to camera
+            this.camera.quaternion.setFromEuler(euler);
         });
     }
     
@@ -147,8 +167,11 @@ export class CameraControls {
     }
     
     update(deltaTime) {
+        // Store previous position for collision resolution
+        const prevPosition = this.camera.position.clone();
+        
         this.updateMovement(deltaTime);
-        this.handleCollisions();
+        this.handleCollisions(prevPosition);
         this.updateSwimmingState();
     }
     
@@ -207,30 +230,125 @@ export class CameraControls {
         this.camera.position.y += this.velocity.y * deltaTime;
     }
     
-    handleCollisions() {
+    handleCollisions(prevPosition) {
         const pos = this.camera.position;
         
-        // Room boundary collision
-        const maxBoundary = this.roomBoundary;
-        if (pos.x > maxBoundary) pos.x = maxBoundary;
-        if (pos.x < -maxBoundary) pos.x = -maxBoundary;
-        if (pos.z > maxBoundary) pos.z = maxBoundary;
-        if (pos.z < -maxBoundary) pos.z = -maxBoundary;
+        // Check all collisions and resolve them
+        let collisionOccurred = false;
         
-        // Check if in pool area
-        const inPoolArea = Math.abs(pos.x) < this.poolBoundary && Math.abs(pos.z) < this.poolBoundary;
+        // Room boundary collision
+        if (pos.x > this.roomBoundary) {
+            pos.x = this.roomBoundary;
+            this.velocity.x = 0;
+            collisionOccurred = true;
+        }
+        if (pos.x < -this.roomBoundary) {
+            pos.x = -this.roomBoundary;
+            this.velocity.x = 0;
+            collisionOccurred = true;
+        }
+        if (pos.z > this.roomBoundary) {
+            pos.z = this.roomBoundary;
+            this.velocity.z = 0;
+            collisionOccurred = true;
+        }
+        if (pos.z < -this.roomBoundary) {
+            pos.z = -this.roomBoundary;
+            this.velocity.z = 0;
+            collisionOccurred = true;
+        }
+        
+        // Pillar collision
+        if (this.checkPillarCollisions(pos, prevPosition)) {
+            collisionOccurred = true;
+        }
+        
+        // Check if in pool area - FIXED: Use larger pool boundary
+        const inPoolArea = Math.abs(pos.x) < 240 && Math.abs(pos.z) < 240; // Match water system
         
         if (inPoolArea) {
             // In pool area - handle pool collisions
             this.handlePoolCollisions();
         } else {
-            // On deck - handle floor collision
-            if (pos.y < this.floorLevel) {
-                pos.y = this.floorLevel;
-                this.velocity.y = 0;
-                this.canJump = true;
+            // On deck - handle stair and floor collisions
+            const stairHeight = this.getStairHeightAtPosition(pos.x, pos.z);
+            if (stairHeight !== null) {
+                // On stairs - use stair height with some tolerance
+                if (pos.y < stairHeight + 2) { // Allow small gap above stairs
+                    pos.y = stairHeight + 2;
+                    this.velocity.y = 0;
+                    this.canJump = true;
+                }
+            } else {
+                // On regular floor
+                if (pos.y < this.floorLevel) {
+                    pos.y = this.floorLevel;
+                    this.velocity.y = 0;
+                    this.canJump = true;
+                }
             }
         }
+    }
+    
+    checkPillarCollisions(pos, prevPosition) {
+        let collisionOccurred = false;
+        
+        for (const pillar of this.pillarPositions) {
+            const distance = Math.sqrt(
+                Math.pow(pos.x - pillar.x, 2) + 
+                Math.pow(pos.z - pillar.z, 2)
+            );
+            
+            if (distance < this.pillarRadius + this.playerRadius) {
+                // Collision detected - push player away from pillar
+                const pushDirection = new THREE.Vector2(
+                    pos.x - pillar.x,
+                    pos.z - pillar.z
+                ).normalize();
+                
+                const pushDistance = (this.pillarRadius + this.playerRadius) - distance + 1;
+                
+                pos.x += pushDirection.x * pushDistance;
+                pos.z += pushDirection.y * pushDistance;
+                
+                // Stop velocity in direction of collision
+                this.velocity.x *= 0.5;
+                this.velocity.z *= 0.5;
+                
+                collisionOccurred = true;
+            }
+        }
+        
+        return collisionOccurred;
+    }
+    
+    getStairHeightAtPosition(x, z) {
+        for (const stair of this.stairPositions) {
+            // Check if position is within stair bounds
+            const stairSize = 100; // Stair footprint
+            const halfSize = stairSize / 2;
+            
+            if (x >= stair.x - halfSize && x <= stair.x + halfSize &&
+                z >= stair.z - halfSize && z <= stair.z + halfSize) {
+                
+                // Calculate height based on distance from stair center
+                // The closer to center, the higher the step
+                const distanceFromCenterX = Math.abs(x - stair.x);
+                const distanceFromCenterZ = Math.abs(z - stair.z);
+                const distanceFromEdge = Math.min(
+                    halfSize - distanceFromCenterX,
+                    halfSize - distanceFromCenterZ
+                );
+                
+                // Each 10 units from edge = 1 step up (8 units high)
+                const stepNumber = Math.floor(distanceFromEdge / 10);
+                const stepHeight = stepNumber * 8; // 8 units per step
+                
+                return this.floorLevel + stepHeight;
+            }
+        }
+        
+        return null; // Not on stairs
     }
     
     handlePoolCollisions() {
@@ -243,20 +361,14 @@ export class CameraControls {
             this.canJump = true;
         }
         
-        // Pool deck level (can climb out)
-        if (pos.y > this.floorLevel) {
-            // Allow jumping out of pool onto deck
-            if (pos.y < this.floorLevel + 0.5) {
-                pos.y = this.floorLevel;
-                this.velocity.y = 0;
-                this.canJump = true;
-            }
-        }
+        // REMOVED the problematic pool deck collision that was preventing entry
+        // Players can now enter and exit the pool freely
     }
     
     updateSwimmingState() {
         const pos = this.camera.position;
-        const inPoolArea = Math.abs(pos.x) < this.poolBoundary && Math.abs(pos.z) < this.poolBoundary;
+        // FIXED: Match the actual pool boundaries from water system
+        const inPoolArea = Math.abs(pos.x) < 240 && Math.abs(pos.z) < 240;
         
         // Update swimming state based on position
         this.isSwimming = inPoolArea && pos.y < this.waterLevel;

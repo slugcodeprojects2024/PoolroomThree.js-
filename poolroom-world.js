@@ -1,4 +1,3 @@
-// poolroom-world.js - Simple Basic Poolroom Layout (LARGER)
 export class PoolroomWorld {
     constructor(scene) {
         this.scene = scene;
@@ -15,9 +14,11 @@ export class PoolroomWorld {
         // Simple groups
         this.architectureGroup = new THREE.Group();
         this.poolGroup = new THREE.Group();
+        this.stairsGroup = new THREE.Group();  // NEW: Just add stairs group
         
         scene.add(this.architectureGroup);
         scene.add(this.poolGroup);
+        scene.add(this.stairsGroup);  // NEW: Add to scene
     }
     
     async init() {
@@ -32,6 +33,9 @@ export class PoolroomWorld {
         this.createBasicPool();
         this.createBasicPillars();
         this.createWallOpenings();
+        
+        // NEW: Just add stairs
+        this.createCornerStaircases();
         
         console.log('✅ Basic poolroom complete');
     }
@@ -179,6 +183,12 @@ export class PoolroomWorld {
                 pillar: new THREE.MeshPhongMaterial({
                     map: pillarTexture,
                     shininess: 50
+                }),
+                
+                // NEW: Just add stair material
+                stair: new THREE.MeshPhongMaterial({
+                    color: 0xe0e0e0,
+                    shininess: 40
                 })
             };
             
@@ -208,6 +218,11 @@ export class PoolroomWorld {
             // Gray pillars
             pillar: new THREE.MeshLambertMaterial({
                 color: 0xd0d0d0
+            }),
+            
+            // NEW: Just add stair material
+            stair: new THREE.MeshLambertMaterial({
+                color: 0xe0e0e0
             })
         };
     }
@@ -404,31 +419,13 @@ export class PoolroomWorld {
         const roomSize = this.roomSize;
         const tileSize = 2.5;
         
-        // Four ceiling sections around the opening
+        // North section - WITH HOLES FOR NW AND NE STAIRS
+        this.createNorthCeilingWithStairHoles(ceilingMaterial, ceilingY, openingSize, roomSize, tileSize);
         
-        // North section
-        const northCeiling = new THREE.Mesh(
-            new THREE.PlaneGeometry(roomSize, (roomSize - openingSize) / 2),
-            ceilingMaterial.clone()
-        );
-        northCeiling.rotation.x = Math.PI / 2;
-        northCeiling.position.set(0, ceilingY, -roomSize/4 - openingSize/4);
-        northCeiling.material.map.repeat.set(roomSize / tileSize, ((roomSize - openingSize) / 2) / tileSize);
-        northCeiling.material.map.needsUpdate = true;
-        this.architectureGroup.add(northCeiling);
+        // South section - WITH HOLES FOR SW AND SE STAIRS
+        this.createSouthCeilingWithStairHoles(ceilingMaterial, ceilingY, openingSize, roomSize, tileSize);
         
-        // South section
-        const southCeiling = new THREE.Mesh(
-            new THREE.PlaneGeometry(roomSize, (roomSize - openingSize) / 2),
-            ceilingMaterial.clone()
-        );
-        southCeiling.rotation.x = Math.PI / 2;
-        southCeiling.position.set(0, ceilingY, roomSize/4 + openingSize/4);
-        southCeiling.material.map.repeat.set(roomSize / tileSize, ((roomSize - openingSize) / 2) / tileSize);
-        southCeiling.material.map.needsUpdate = true;
-        this.architectureGroup.add(southCeiling);
-        
-        // East section
+        // East section (no stairs here)
         const eastCeiling = new THREE.Mesh(
             new THREE.PlaneGeometry((roomSize - openingSize) / 2, openingSize),
             ceilingMaterial.clone()
@@ -439,7 +436,7 @@ export class PoolroomWorld {
         eastCeiling.material.map.needsUpdate = true;
         this.architectureGroup.add(eastCeiling);
         
-        // West section
+        // West section (no stairs here)
         const westCeiling = new THREE.Mesh(
             new THREE.PlaneGeometry((roomSize - openingSize) / 2, openingSize),
             ceilingMaterial.clone()
@@ -450,7 +447,97 @@ export class PoolroomWorld {
         westCeiling.material.map.needsUpdate = true;
         this.architectureGroup.add(westCeiling);
         
-        console.log('Tiled ceiling with opening created');
+        console.log('Tiled ceiling with all 4 stair openings created');
+    }
+    
+    createNorthCeilingWithStairHoles(ceilingMaterial, ceilingY, openingSize, roomSize, tileSize) {
+        // North section has stairs at: NW (-350, -350) and NE (350, -350)
+        const northSectionZ = -roomSize/4 - openingSize/4; // -360
+        const sectionWidth = roomSize; // 960
+        const sectionHeight = (roomSize - openingSize) / 2; // 360
+        const holeSize = 100;
+        
+        // NW stair hole at x: -350
+        const nwHoleX = -350;
+        const nwHoleZ = -350;
+        
+        // NE stair hole at x: 350  
+        const neHoleX = 350;
+        const neHoleZ = -350;
+        
+        // Create ceiling pieces - we need 5 pieces to avoid both holes
+        
+        // Far west piece (west of NW hole)
+        const farWestWidth = (sectionWidth/2) + nwHoleX - holeSize/2;
+        if (farWestWidth > 0) {
+            this.createCeilingPiece(ceilingMaterial, farWestWidth, sectionHeight, 
+                                  -sectionWidth/2 + farWestWidth/2, ceilingY, northSectionZ, tileSize);
+        }
+        
+        // Middle piece (between the two holes)
+        const middleWidth = neHoleX - nwHoleX - holeSize;
+        if (middleWidth > 0) {
+            this.createCeilingPiece(ceilingMaterial, middleWidth, sectionHeight,
+                                  (nwHoleX + neHoleX)/2, ceilingY, northSectionZ, tileSize);
+        }
+        
+        // Far east piece (east of NE hole)
+        const farEastWidth = (sectionWidth/2) - neHoleX - holeSize/2;
+        if (farEastWidth > 0) {
+            this.createCeilingPiece(ceilingMaterial, farEastWidth, sectionHeight,
+                                  neHoleX + holeSize/2 + farEastWidth/2, ceilingY, northSectionZ, tileSize);
+        }
+        
+        // North strips above holes (if needed)
+        const northStripHeight = sectionHeight/2 - holeSize/2;
+        if (northStripHeight > 0) {
+            // Above NW hole
+            this.createCeilingPiece(ceilingMaterial, holeSize, northStripHeight,
+                                  nwHoleX, ceilingY, northSectionZ - sectionHeight/2 + northStripHeight/2, tileSize);
+            // Above NE hole  
+            this.createCeilingPiece(ceilingMaterial, holeSize, northStripHeight,
+                                  neHoleX, ceilingY, northSectionZ - sectionHeight/2 + northStripHeight/2, tileSize);
+        }
+        
+        // South strips below holes (if needed)
+        const southStripHeight = sectionHeight/2 - holeSize/2;
+        if (southStripHeight > 0) {
+            // Below NW hole
+            this.createCeilingPiece(ceilingMaterial, holeSize, southStripHeight,
+                                  nwHoleX, ceilingY, northSectionZ + sectionHeight/2 - southStripHeight/2, tileSize);
+            // Below NE hole
+            this.createCeilingPiece(ceilingMaterial, holeSize, southStripHeight,
+                                  neHoleX, ceilingY, northSectionZ + sectionHeight/2 - southStripHeight/2, tileSize);
+        }
+        
+        console.log('Created north ceiling with NW and NE stair holes');
+    }
+    
+    createSouthCeilingWithStairHoles(ceilingMaterial, ceilingY, openingSize, roomSize, tileSize) {
+        // South section now has NO stair holes - create one solid piece
+        const southSectionZ = roomSize/4 + openingSize/4; // 360
+        const sectionWidth = roomSize; // 960
+        const sectionHeight = (roomSize - openingSize) / 2; // 360
+        
+        // Create one solid ceiling piece for entire south section
+        this.createCeilingPiece(ceilingMaterial, sectionWidth, sectionHeight,
+                              0, ceilingY, southSectionZ, tileSize);
+        
+        console.log('Created solid south ceiling (no stair holes)');
+    }
+    
+    createCeilingPiece(material, width, height, x, y, z, tileSize) {
+        if (width <= 0 || height <= 0) return; // Skip invalid pieces
+        
+        const piece = new THREE.Mesh(
+            new THREE.PlaneGeometry(width, height),
+            material.clone()
+        );
+        piece.rotation.x = Math.PI / 2;
+        piece.position.set(x, y, z);
+        piece.material.map.repeat.set(width / tileSize, height / tileSize);
+        piece.material.map.needsUpdate = true;
+        this.architectureGroup.add(piece);
     }
     
     createBasicPool() {
@@ -660,6 +747,101 @@ export class PoolroomWorld {
         console.log('🌤️ Basic gradient skybox with clouds created');
     }
     
+    // ===== NEW: JUST THE STAIRS =====
+    
+    createCornerStaircases() {
+        console.log('🏗️ Creating corner staircases...');
+        
+        // Only keep north section stairs - remove both south stairs
+        const stairPositions = [
+            { x: -350, z: -350, name: 'northwest' },  // North section has opening
+            { x: 350, z: -350, name: 'northeast' }    // North section has opening
+            // Removed: { x: -350, z: 350, name: 'southwest' }
+            // Removed: { x: 350, z: 350, name: 'southeast' }
+        ];
+        
+        stairPositions.forEach(stairPos => {
+            this.createSingleStaircase(stairPos.x, stairPos.z, stairPos.name);
+        });
+        
+        console.log('✅ Corner staircases created (2 stairs: NW, NE only)');
+    }
+    
+    createSingleStaircase(x, z, name) {
+        const stairGroup = new THREE.Group();
+        stairGroup.name = `staircase-${name}`;
+        
+        // Stairs going up to ceiling level
+        const targetHeight = this.wallHeight;  // Just go to ceiling level for now
+        const stepHeight = 8;
+        const stepDepth = 12;
+        const stairWidth = 40;
+        const numSteps = Math.ceil(targetHeight / stepHeight);
+        
+        // Create each step
+        for (let i = 0; i < numSteps; i++) {
+            const stepY = i * stepHeight;
+            
+            // Step geometry - wider for comfort
+            const stepGeometry = new THREE.BoxGeometry(
+                stairWidth, 
+                stepHeight, 
+                stepDepth
+            );
+            
+            const step = new THREE.Mesh(stepGeometry, this.materials.stair);
+            
+            // Position step - NOTE THE ACTUAL POSITIONING
+            step.position.set(
+                x, 
+                stepY + stepHeight/2, 
+                z + (i * stepDepth) - (numSteps * stepDepth / 2)
+            );
+            
+            stairGroup.add(step);
+        }
+        
+        // Add simple railings
+        this.createStairRailings(stairGroup, x, z, numSteps, stepHeight, stepDepth, stairWidth);
+        
+        // Add landing at the top
+        const landingGeometry = new THREE.BoxGeometry(
+            stairWidth + 20, 
+            4, 
+            stairWidth + 20
+        );
+        const landing = new THREE.Mesh(landingGeometry, this.materials.stair);
+        landing.position.set(x, targetHeight + 2, z);
+        stairGroup.add(landing);
+        
+        this.stairsGroup.add(stairGroup);
+        console.log(`📐 Created ${name} staircase with ${numSteps} steps`);
+        console.log(`📐 Staircase spans from Z: ${z - (numSteps * stepDepth / 2)} to Z: ${z + (numSteps * stepDepth / 2)}`);
+    }
+    
+    createStairRailings(stairGroup, x, z, numSteps, stepHeight, stepDepth, stairWidth) {
+        const railHeight = 12;
+        const railWidth = 2;
+        
+        // Side railings
+        for (let side = -1; side <= 1; side += 2) {
+            const railGeometry = new THREE.BoxGeometry(
+                railWidth, 
+                railHeight, 
+                numSteps * stepDepth
+            );
+            
+            const railing = new THREE.Mesh(railGeometry, this.materials.stair);
+            railing.position.set(
+                x + side * (stairWidth/2 + railWidth/2),
+                (numSteps * stepHeight) / 2 + railHeight/2,
+                z
+            );
+            
+            stairGroup.add(railing);
+        }
+    }
+    
     // Simple getters
     getPoolBounds() {
         return {
@@ -675,5 +857,24 @@ export class PoolroomWorld {
             size: this.roomSize,
             height: this.wallHeight
         };
+    }
+    
+    // NEW: Utility methods for stairs
+    getStaircasePositions() {
+        // Return only the 2 stairs that actually exist
+        return [
+            { x: -350, z: -350, name: 'northwest' },
+            { x: 350, z: -350, name: 'northeast' }
+            // Removed southwest and southeast staircases
+        ];
+    }
+    
+    isNearStaircase(position, threshold = 50) {
+        const stairs = this.getStaircasePositions();
+        return stairs.some(stair => {
+            const dx = position.x - stair.x;
+            const dz = position.z - stair.z;
+            return Math.sqrt(dx*dx + dz*dz) < threshold;
+        });
     }
 }
