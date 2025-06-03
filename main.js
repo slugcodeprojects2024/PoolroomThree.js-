@@ -1,4 +1,4 @@
-// main.js - Three.js Poolrooms Application Entry Point
+// main.js - Fixed Three.js Poolrooms Application Entry Point
 import { CameraControls } from './camera-controls.js';
 import { PoolroomWorld } from './poolroom-world.js';
 import { WaterSystem } from './water-system.js';
@@ -65,18 +65,19 @@ class PoolroomsApp {
     }
     
     initThreeJS() {
-        // Create scene with no fog for maximum brightness
+        // Create scene with bright background
         this.scene = new THREE.Scene();
         this.scene.background = new THREE.Color(0xE6F3FF);  // Very light blue-white background
         
-        // Create camera
+        // Create camera - FIXED STARTING POSITION
         this.camera = new THREE.PerspectiveCamera(
             75, 
             window.innerWidth / window.innerHeight, 
             0.1, 
-            1000
+            2000
         );
-        this.camera.position.set(150, 5, 150); // Start position in the massive poolroom
+        // Start ABOVE GROUND at edge of pool area with good view
+        this.camera.position.set(0, 15, 250); // x=0 (center), y=15 (above floor), z=250 (back from pool)
         
         // Create renderer
         this.renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -85,8 +86,8 @@ class PoolroomsApp {
         this.renderer.shadowMap.enabled = true;
         this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         this.renderer.outputEncoding = THREE.sRGBEncoding;
-        this.renderer.toneMapping = THREE.LinearToneMapping;  // Change to linear for brighter output
-        this.renderer.toneMappingExposure = 2.0;  // Increase exposure for brightness
+        this.renderer.toneMapping = THREE.LinearToneMapping;
+        this.renderer.toneMappingExposure = 1.5;  // Bright but not blown out
         
         // Add to DOM
         document.getElementById('canvas-container').appendChild(this.renderer.domElement);
@@ -94,77 +95,31 @@ class PoolroomsApp {
         // Handle window resize
         window.addEventListener('resize', () => this.onWindowResize(), false);
         
-        console.log('🎮 Three.js core initialized');
+        console.log('🎮 Three.js core initialized with fixed camera position');
     }
     
     setupLighting() {
-        // EXTREMELY bright ambient light for poolrooms aesthetic
-        const ambientLight = new THREE.AmbientLight(0xffffff, 1.2);  // Very bright white ambient
+        // Much dimmer lighting to see tile details
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.2); // Very low ambient
         this.scene.add(ambientLight);
         
-        // Main directional light (sun through ceiling opening) - extremely bright
-        const mainLight = new THREE.DirectionalLight(0xffffff, 2.0);
+        // Single directional light - much dimmer
+        const mainLight = new THREE.DirectionalLight(0xffffff, 0.4); // Much lower
         mainLight.position.set(0, 100, 0);
         mainLight.castShadow = true;
-        mainLight.shadow.mapSize.width = 4096;
-        mainLight.shadow.mapSize.height = 4096;
+        mainLight.shadow.mapSize.width = 2048;
+        mainLight.shadow.mapSize.height = 2048;
         mainLight.shadow.camera.near = 0.1;
         mainLight.shadow.camera.far = 200;
-        mainLight.shadow.camera.left = -400;
-        mainLight.shadow.camera.right = 400;
-        mainLight.shadow.camera.top = 400;
-        mainLight.shadow.camera.bottom = -400;
+        mainLight.shadow.camera.left = -300;
+        mainLight.shadow.camera.right = 300;
+        mainLight.shadow.camera.top = 300;
+        mainLight.shadow.camera.bottom = -300;
         this.scene.add(mainLight);
         
-        // Additional VERY bright lights around the massive room
-        const roomLightPositions = [
-            [-200, 30, -200],
-            [200, 30, -200],
-            [-200, 30, 200],
-            [200, 30, 200],
-            [0, 30, -300],
-            [0, 30, 300],
-            [-300, 30, 0],
-            [300, 30, 0],
-            // Extra lights for corners
-            [-300, 30, -300],
-            [300, 30, -300],
-            [-300, 30, 300],
-            [300, 30, 300]
-        ];
+        // Remove all other lights for now to see the tiles clearly
         
-        roomLightPositions.forEach(pos => {
-            const roomLight = new THREE.DirectionalLight(0xffffff, 0.8);  // Much brighter
-            roomLight.position.set(pos[0], pos[1], pos[2]);
-            roomLight.target.position.set(0, 0, 0);
-            this.scene.add(roomLight);
-            this.scene.add(roomLight.target);
-        });
-        
-        // Very bright hemisphere light for overall bright atmosphere
-        const hemisphereLight = new THREE.HemisphereLight(0xffffbb, 0x444444, 1.0);  // Much brighter
-        this.scene.add(hemisphereLight);
-        
-        // Add point lights throughout the space for even more brightness
-        const pointLightPositions = [
-            [0, 20, 0],      // Center above pool
-            [-150, 25, -150],
-            [150, 25, -150],
-            [-150, 25, 150],
-            [150, 25, 150],
-            [0, 25, -200],
-            [0, 25, 200],
-            [-200, 25, 0],
-            [200, 25, 0]
-        ];
-        
-        pointLightPositions.forEach(pos => {
-            const pointLight = new THREE.PointLight(0xffffff, 0.8, 300);
-            pointLight.position.set(pos[0], pos[1], pos[2]);
-            this.scene.add(pointLight);
-        });
-        
-        console.log('💡 VERY bright poolrooms lighting system initialized');
+        console.log('💡 Minimal lighting for tile visibility');
     }
     
     animate() {
@@ -196,7 +151,8 @@ class PoolroomsApp {
     
     updateUI() {
         const pos = this.camera.position;
-        const isInWater = pos.y < 0 && Math.abs(pos.x) < 45 && Math.abs(pos.z) < 45;
+        // Updated bounds for the larger pool
+        const isInWater = pos.y < 0 && Math.abs(pos.x) < 200 && Math.abs(pos.z) < 200;
         const isPointerLocked = this.cameraControls ? this.cameraControls.isPointerLocked : false;
         
         document.getElementById('status').innerHTML = `
