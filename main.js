@@ -1,4 +1,5 @@
 // main.js - Fixed Three.js Poolrooms Application Entry Point
+import * as THREE from 'three';
 import { CameraControls } from './camera-controls.js';
 import { PoolroomWorld } from './poolroom-world.js';
 import { WaterSystem } from './water-system.js';

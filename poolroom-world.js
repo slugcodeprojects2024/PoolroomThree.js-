@@ -1,4 +1,7 @@
 // poolroom-world.js - Single Story with Temple Walkway
+import * as THREE from 'three';
+import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
+
 export class PoolroomWorld {
     constructor(scene) {
         this.scene = scene;
@@ -901,10 +904,13 @@ export class PoolroomWorld {
         // Classic Greek exterior facade (single row colonnade front and back)
         this.createGreekTempleFacade(templeZ);
 
+        // Load the head.obj in the center of the temple
+        this.loadTempleHeadModel();
+
         console.log('✅ Refactored temple complex created');
     }
 
-   createGreekTempleFacade(templeZ) {
+    createGreekTempleFacade(templeZ) {
         // Front columns - positioned well inside the temple floor (much further back)
         const colZFront = templeZ - this.templeSize/2 + 200; // Move much further inward from front edge
         for (let x = -400; x <= 400; x += 80) {
@@ -1068,7 +1074,7 @@ export class PoolroomWorld {
         // Sun mesh
         const sun = new THREE.Mesh(
             new THREE.SphereGeometry(120, 32, 32),
-            new THREE.MeshBasicMaterial({ color: 0xFFFACD, emissive: 0xFFFF99 }) // Bright yellow/white
+            new THREE.MeshStandardMaterial({ color: 0xFFFACD, emissive: 0xFFFF99, emissiveIntensity: 1 })
         );
         sun.position.copy(sunPos);
         this.scene.add(sun);
@@ -1146,7 +1152,7 @@ export class PoolroomWorld {
         // Central raised altar area
         const altarPlatform = new THREE.Mesh(
             new THREE.CylinderGeometry(80, 90, 8, 12),
-            this.materials.temple
+            this.materials.stoneColumn
         );
         altarPlatform.position.set(0, 4, templeZ);
         this.templeGroup.add(altarPlatform);
@@ -1154,7 +1160,7 @@ export class PoolroomWorld {
         // Altar itself
         const altar = new THREE.Mesh(
             new THREE.BoxGeometry(40, 20, 20),
-            this.materials.vaporwave
+            this.materials.stoneColumn
         );
         altar.position.set(0, 18, templeZ);
         this.templeGroup.add(altar);
@@ -1165,7 +1171,7 @@ export class PoolroomWorld {
             const radius = 60;
             const brazier = new THREE.Mesh(
                 new THREE.CylinderGeometry(8, 12, 20, 8),
-                this.materials.vaporwave
+                this.materials.stoneColumn
             );
             brazier.position.set(
                 Math.cos(angle) * radius,
@@ -1221,5 +1227,31 @@ export class PoolroomWorld {
 
     getPoolBottomMesh() {
         return this.poolBottomMesh;
+    }
+
+    async loadTempleHeadModel() {
+        const loader = new OBJLoader();
+        loader.load(
+            'models/head.obj',
+            (object) => {
+                // Center geometry and enable shadows
+                object.traverse(child => {
+                    if (child.isMesh) {
+                        if (child.geometry.center) child.geometry.center();
+                        child.castShadow = true;
+                        child.receiveShadow = true;
+                    }
+                });
+                // Scale and position
+                object.scale.set(2.5, 2.5, 2.5); // Statue-sized
+                const templeBounds = this.getTempleBounds();
+                object.position.set(0, 70, templeBounds.z); // Raised above altar
+                this.templeGroup.add(object);
+            },
+            undefined,
+            (error) => {
+                console.error('Error loading head.obj:', error);
+            }
+        );
     }
 }

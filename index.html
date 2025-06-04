@@ -115,8 +115,15 @@
         <div id="collectibles-counter">Collectibles: 0/10</div>
     </div>
 
-    <!-- Three.js CDN - GitHub Pages friendly -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- Import maps for Three.js modules -->
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.162.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.162.0/examples/jsm/"
+        }
+    }
+    </script>
     
     <!-- Load our modular components -->
     <script type="module" src="main.js"></script>

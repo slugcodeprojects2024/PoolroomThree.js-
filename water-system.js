@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 // water-system.js - Simple Water System (NO FLOATING OBJECTS)
 export class WaterSystem {
     constructor(scene) {

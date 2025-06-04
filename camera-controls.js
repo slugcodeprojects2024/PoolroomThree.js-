@@ -1,4 +1,6 @@
 // camera-controls.js - Single Story Design
+import * as THREE from 'three';
+
 export class CameraControls {
     constructor(camera, domElement, poolBottomMesh, invisibleWalls = []) {
         this.camera = camera;
