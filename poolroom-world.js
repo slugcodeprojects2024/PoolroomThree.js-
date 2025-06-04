@@ -1,32 +1,44 @@
+// poolroom-world.js - Single Story with Temple Walkway
 export class PoolroomWorld {
     constructor(scene) {
         this.scene = scene;
         this.materials = {};
         
-        // Just make everything bigger
-        this.roomSize = 960;          // Double the size (480 * 2)
-        this.wallHeight = 150;        // Keep height the same
-        this.poolWidth = 480;         // Double the pool (240 * 2)
+        // Main poolroom dimensions
+        this.roomSize = 960;
+        this.wallHeight = 150;
+        this.poolWidth = 480;
         this.poolDepth = 480;
-        this.poolDepthValue = 20;     // Much deeper pool
-        this.openingSize = 240;       // Double the opening (120 * 2)
+        this.poolDepthValue = 20;
+        this.openingSize = 240;
         
-        // Simple groups
+        // NEW: Walkway and temple dimensions - EXPANDED
+        this.walkwayLength = 800;    // DOUBLED from 400
+        this.walkwayWidth = 80;
+        this.templeSize = 960;       // SAME SIZE AS POOLROOM
+        this.grottoPoolSize = 120;
+        this.artGallerySize = 400;   // NEW: Art gallery wing
+        
+        // Groups
         this.architectureGroup = new THREE.Group();
         this.poolGroup = new THREE.Group();
-        this.stairsGroup = new THREE.Group();  // NEW: Just add stairs group
+        this.walkwayGroup = new THREE.Group();
+        this.templeGroup = new THREE.Group();
         
         scene.add(this.architectureGroup);
         scene.add(this.poolGroup);
-        scene.add(this.stairsGroup);  // NEW: Add to scene
+        scene.add(this.walkwayGroup);
+        scene.add(this.templeGroup);
     }
     
     async init() {
-        console.log('🏗️ Creating basic poolroom...');
+        console.log('🏗️ Creating single-story poolroom with temple...');
         
-        await this.loadTextures(); // Load textures first
+        await this.loadTextures();
         this.createTexturedMaterials();
-        this.createBasicSkybox();      // Add skybox early
+        this.createBasicSkybox();
+        
+        // Main poolroom
         this.createBasicFloor();
         this.createBasicWalls();
         this.createBasicCeiling();
@@ -34,10 +46,13 @@ export class PoolroomWorld {
         this.createBasicPillars();
         this.createWallOpenings();
         
-        // NEW: Just add stairs
-        this.createCornerStaircases();
+        // NEW: Door, walkway, and temple
+        this.createDoor();
+        this.createWalkway();
+        this.createTempleArea();
+        this.createGrottoPool();
         
-        console.log('✅ Basic poolroom complete');
+        console.log('✅ Single-story poolroom with temple complete');
     }
     
     async loadTextures() {
@@ -47,13 +62,11 @@ export class PoolroomWorld {
         try {
             console.log('🔄 Loading textures...');
             
-            // Load end stone bricks for walls/floors/ceilings
             this.textures.endStoneBricks = await new Promise((resolve, reject) => {
                 this.textureLoader.load(
                     'textures/end_stone_bricks.png',
                     (texture) => {
                         console.log('✅ End stone bricks loaded');
-                        console.log('Texture dimensions:', texture.image.width, 'x', texture.image.height);
                         resolve(texture);
                     },
                     undefined,
@@ -64,13 +77,11 @@ export class PoolroomWorld {
                 );
             });
             
-            // Load dark prismarine for pillars
             this.textures.darkPrismarine = await new Promise((resolve, reject) => {
                 this.textureLoader.load(
                     'textures/dark_prismarine.png',
                     (texture) => {
                         console.log('✅ Dark prismarine loaded');
-                        console.log('Texture dimensions:', texture.image.width, 'x', texture.image.height);
                         resolve(texture);
                     },
                     undefined,
@@ -81,14 +92,13 @@ export class PoolroomWorld {
                 );
             });
             
-            // Configure textures properly
             Object.values(this.textures).forEach(texture => {
                 texture.wrapS = THREE.RepeatWrapping;
                 texture.wrapT = THREE.RepeatWrapping;
-                texture.magFilter = THREE.LinearFilter; // Try linear instead of nearest
+                texture.magFilter = THREE.LinearFilter;
                 texture.minFilter = THREE.LinearMipMapLinearFilter;
                 texture.generateMipmaps = true;
-                texture.needsUpdate = true; // Force update
+                texture.needsUpdate = true;
             });
             
             console.log('✅ All textures loaded and configured successfully');
@@ -100,25 +110,21 @@ export class PoolroomWorld {
     }
     
     createTexturedMaterials() {
-        // Go back to the grid texture that was working
         const createFloorTiles = () => {
             const canvas = document.createElement('canvas');
-            canvas.width = 512;  // High resolution
+            canvas.width = 512;
             canvas.height = 512;
             const ctx = canvas.getContext('2d');
             
-            // Fill with white base
             ctx.fillStyle = '#ffffff';
             ctx.fillRect(0, 0, 512, 512);
             
-            // Draw a grid of tiles - 16x16 tiles = 32px per tile
             const tilesPerSide = 16;
-            const tileSize = 512 / tilesPerSide; // 32px per tile
+            const tileSize = 512 / tilesPerSide;
             
             ctx.strokeStyle = '#cccccc';
             ctx.lineWidth = 2;
             
-            // Draw vertical lines
             for (let i = 0; i <= tilesPerSide; i++) {
                 const x = i * tileSize;
                 ctx.beginPath();
@@ -127,7 +133,6 @@ export class PoolroomWorld {
                 ctx.stroke();
             }
             
-            // Draw horizontal lines
             for (let i = 0; i <= tilesPerSide; i++) {
                 const y = i * tileSize;
                 ctx.beginPath();
@@ -147,7 +152,6 @@ export class PoolroomWorld {
         const floorTexture = createFloorTiles();
         
         if (this.textures) {
-            // Pillar texture (keep as is)
             const pillarTexture = this.textures.darkPrismarine.clone();
             pillarTexture.repeat.set(2, 8);
             pillarTexture.wrapS = THREE.RepeatWrapping;
@@ -158,41 +162,43 @@ export class PoolroomWorld {
             pillarTexture.needsUpdate = true;
             
             this.materials = {
-                // Floor material with single tile texture
                 floor: new THREE.MeshPhongMaterial({
                     map: floorTexture,
                     shininess: 30
                 }),
-                
-                // Simple colors for everything else
                 wall: new THREE.MeshPhongMaterial({
                     color: 0xf0f0f0,
                     shininess: 30
                 }),
-                
                 ceiling: new THREE.MeshPhongMaterial({
                     color: 0xf0f0f0,
                     shininess: 30
                 }),
-                
                 pool: new THREE.MeshPhongMaterial({
                     color: 0xb0d0ff,
                     shininess: 100
                 }),
-                
                 pillar: new THREE.MeshPhongMaterial({
                     map: pillarTexture,
                     shininess: 50
                 }),
-                
-                // NEW: Just add stair material
-                stair: new THREE.MeshPhongMaterial({
-                    color: 0xe0e0e0,
-                    shininess: 40
+                // NEW: Temple materials
+                temple: new THREE.MeshPhongMaterial({
+                    color: 0xffffff,
+                    shininess: 80
+                }),
+                vaporwave: new THREE.MeshPhongMaterial({
+                    color: 0xff69b4, // Hot pink
+                    shininess: 100,
+                    emissive: 0x330066 // Purple glow
+                }),
+                door: new THREE.MeshPhongMaterial({
+                    color: 0x8b4513,
+                    shininess: 20
                 })
             };
             
-            console.log('Single tile texture created for perfect repeating');
+            console.log('Materials created with temple elements');
         } else {
             this.createBasicMaterials();
         }
@@ -200,49 +206,29 @@ export class PoolroomWorld {
     
     createBasicMaterials() {
         this.materials = {
-            // Light cream floor
-            floor: new THREE.MeshLambertMaterial({
-                color: 0xf5f5f0
-            }),
-            
-            // Light walls
-            wall: new THREE.MeshLambertMaterial({
-                color: 0xe8e8e8
-            }),
-            
-            // Pool blue
-            pool: new THREE.MeshLambertMaterial({
-                color: 0xb0d0ff
-            }),
-            
-            // Gray pillars
-            pillar: new THREE.MeshLambertMaterial({
-                color: 0xd0d0d0
-            }),
-            
-            // NEW: Just add stair material
-            stair: new THREE.MeshLambertMaterial({
-                color: 0xe0e0e0
-            })
+            floor: new THREE.MeshLambertMaterial({ color: 0xf5f5f0 }),
+            wall: new THREE.MeshLambertMaterial({ color: 0xe8e8e8 }),
+            ceiling: new THREE.MeshLambertMaterial({ color: 0xe8e8e8 }),
+            pool: new THREE.MeshLambertMaterial({ color: 0xb0d0ff }),
+            pillar: new THREE.MeshLambertMaterial({ color: 0xd0d0d0 }),
+            temple: new THREE.MeshLambertMaterial({ color: 0xffffff }),
+            vaporwave: new THREE.MeshLambertMaterial({ color: 0xff69b4 }),
+            door: new THREE.MeshLambertMaterial({ color: 0x8b4513 })
         };
     }
     
     createBasicFloor() {
-        // Create 4 sections with very small tiles
         const roomSize = this.roomSize;
         const poolSize = this.poolWidth;
         
-        // Create a simple tile texture - just a white square with black border
         const canvas = document.createElement('canvas');
         canvas.width = 32;
         canvas.height = 32;
         const ctx = canvas.getContext('2d');
         
-        // White tile
         ctx.fillStyle = '#f5f5f0';
         ctx.fillRect(0, 0, 32, 32);
         
-        // Thin black border
         ctx.strokeStyle = '#cccccc';
         ctx.lineWidth = 1;
         ctx.strokeRect(0, 0, 32, 32);
@@ -253,40 +239,33 @@ export class PoolroomWorld {
         tileTexture.magFilter = THREE.NearestFilter;
         tileTexture.minFilter = THREE.NearestFilter;
         
-        // Calculate section dimensions
         const sideWidth = (roomSize - poolSize) / 2;
-        
-        // Much smaller tiles - 2.5 world units per tile
         const tileSize = 2.5;
         
         const floorSections = [
-            // North section (960 x 240)
             { 
                 geometry: new THREE.PlaneGeometry(roomSize, sideWidth),
                 position: [0, 0, -(poolSize/2 + sideWidth/2)],
-                repeatX: roomSize / tileSize,  // 384 tiles
-                repeatY: sideWidth / tileSize  // 96 tiles
+                repeatX: roomSize / tileSize,
+                repeatY: sideWidth / tileSize
             },
-            // South section (960 x 240)
             { 
                 geometry: new THREE.PlaneGeometry(roomSize, sideWidth),
                 position: [0, 0, poolSize/2 + sideWidth/2],
-                repeatX: roomSize / tileSize,  // 384 tiles
-                repeatY: sideWidth / tileSize  // 96 tiles
+                repeatX: roomSize / tileSize,
+                repeatY: sideWidth / tileSize
             },
-            // East section (240 x 480)
             { 
                 geometry: new THREE.PlaneGeometry(sideWidth, poolSize),
                 position: [poolSize/2 + sideWidth/2, 0, 0],
-                repeatX: sideWidth / tileSize, // 96 tiles
-                repeatY: poolSize / tileSize   // 192 tiles
+                repeatX: sideWidth / tileSize,
+                repeatY: poolSize / tileSize
             },
-            // West section (240 x 480)
             { 
                 geometry: new THREE.PlaneGeometry(sideWidth, poolSize),
                 position: [-(poolSize/2 + sideWidth/2), 0, 0],
-                repeatX: sideWidth / tileSize, // 96 tiles
-                repeatY: poolSize / tileSize   // 192 tiles
+                repeatX: sideWidth / tileSize,
+                repeatY: poolSize / tileSize
             }
         ];
         
@@ -299,28 +278,24 @@ export class PoolroomWorld {
             floor.rotation.x = -Math.PI / 2;
             floor.position.set(...section.position);
             
-            // Set the repeat based on section dimensions
             floor.material.map.repeat.set(section.repeatX, section.repeatY);
             floor.material.map.needsUpdate = true;
             
             this.architectureGroup.add(floor);
         });
         
-        console.log('Floor with tiny 2.5x2.5 tiles created');
+        console.log('Floor created');
     }
     
     createBasicWalls() {
-        // Create a simple tile texture - just a white square with black border
         const canvas = document.createElement('canvas');
         canvas.width = 32;
         canvas.height = 32;
         const ctx = canvas.getContext('2d');
         
-        // White tile - EXACT SAME AS FLOOR
         ctx.fillStyle = '#f5f5f0';
         ctx.fillRect(0, 0, 32, 32);
         
-        // Thin black border - EXACT SAME AS FLOOR
         ctx.strokeStyle = '#cccccc';
         ctx.lineWidth = 1;
         ctx.strokeRect(0, 0, 32, 32);
@@ -333,17 +308,47 @@ export class PoolroomWorld {
         
         const roomSize = this.roomSize;
         const wallHeight = this.wallHeight;
-        const tileSize = 2.5; // Same as floor tiles
+        const tileSize = 2.5;
+        const wallOffset = 2;
         
-        // Create 4 walls - move them closer to room center to fix collision
-        const wallOffset = 2; // Move walls 2 units inward
-        const walls = [
-            // North wall
+        // Create walls but with a gap in the north wall for the door
+        const doorWidth = 100;
+        const doorOffset = 0; // CENTER THE DOOR
+        
+        // North wall - split around centered door
+        const northWallSections = [
+            // Left section
             {
-                geometry: new THREE.PlaneGeometry(roomSize, wallHeight),
-                position: [0, wallHeight/2, -roomSize/2 + wallOffset],
+                width: (roomSize/2) - (doorWidth/2),
+                position: [-roomSize/2 + wallOffset + ((roomSize/2) - (doorWidth/2))/2, wallHeight/2, -roomSize/2 + wallOffset],
                 rotation: [0, 0, 0]
             },
+            // Right section  
+            {
+                width: (roomSize/2) - (doorWidth/2),
+                position: [(doorWidth/2) + ((roomSize/2) - (doorWidth/2))/2, wallHeight/2, -roomSize/2 + wallOffset],
+                rotation: [0, 0, 0]
+            }
+        ];
+        
+        northWallSections.forEach(section => {
+            const material = new THREE.MeshLambertMaterial({
+                map: tileTexture.clone(),
+                emissive: 0x606060
+            });
+            
+            const wall = new THREE.Mesh(new THREE.PlaneGeometry(section.width, wallHeight), material);
+            wall.position.set(...section.position);
+            wall.rotation.set(...section.rotation);
+            
+            wall.material.map.repeat.set(section.width / tileSize, wallHeight / tileSize);
+            wall.material.map.needsUpdate = true;
+            
+            this.architectureGroup.add(wall);
+        });
+        
+        // Other walls (no changes)
+        const otherWalls = [
             // South wall  
             {
                 geometry: new THREE.PlaneGeometry(roomSize, wallHeight),
@@ -364,42 +369,34 @@ export class PoolroomWorld {
             }
         ];
         
-        walls.forEach((wallData, index) => {
-            // Same material as floor but with moderate emissive 
+        otherWalls.forEach((wallData, index) => {
             const material = new THREE.MeshLambertMaterial({
                 map: tileTexture.clone(),
-                emissive: 0x606060  // Middle ground between 0x404040 and 0x808080
+                emissive: 0x606060
             });
             
             const wall = new THREE.Mesh(wallData.geometry, material);
             wall.position.set(...wallData.position);
             wall.rotation.set(...wallData.rotation);
             
-            // Set tile repeat for walls
-            const repeatX = roomSize / tileSize;
-            const repeatY = wallHeight / tileSize;
-            
-            wall.material.map.repeat.set(repeatX, repeatY);
+            wall.material.map.repeat.set(roomSize / tileSize, wallHeight / tileSize);
             wall.material.map.needsUpdate = true;
             
             this.architectureGroup.add(wall);
         });
         
-        console.log('Walls with moderate emissive lighting');
+        console.log('Walls with centered door opening created');
     }
     
     createBasicCeiling() {
-        // Create the same tile texture
         const canvas = document.createElement('canvas');
         canvas.width = 32;
         canvas.height = 32;
         const ctx = canvas.getContext('2d');
         
-        // White tile - same as floor
         ctx.fillStyle = '#f5f5f0';
         ctx.fillRect(0, 0, 32, 32);
         
-        // Thin black border
         ctx.strokeStyle = '#cccccc';
         ctx.lineWidth = 1;
         ctx.strokeRect(0, 0, 32, 32);
@@ -419,131 +416,48 @@ export class PoolroomWorld {
         const roomSize = this.roomSize;
         const tileSize = 2.5;
         
-        // North section - WITH HOLES FOR NW AND NE STAIRS
-        this.createNorthCeilingWithStairHoles(ceilingMaterial, ceilingY, openingSize, roomSize, tileSize);
+        // Simple ceiling with central opening (no stair holes needed)
+        const ceilingSections = [
+            // North section
+            { 
+                geometry: new THREE.PlaneGeometry(roomSize, (roomSize - openingSize) / 2),
+                position: [0, ceilingY, -roomSize/4 - openingSize/4]
+            },
+            // South section
+            { 
+                geometry: new THREE.PlaneGeometry(roomSize, (roomSize - openingSize) / 2),
+                position: [0, ceilingY, roomSize/4 + openingSize/4]
+            },
+            // East section
+            { 
+                geometry: new THREE.PlaneGeometry((roomSize - openingSize) / 2, openingSize),
+                position: [roomSize/4 + openingSize/4, ceilingY, 0]
+            },
+            // West section
+            { 
+                geometry: new THREE.PlaneGeometry((roomSize - openingSize) / 2, openingSize),
+                position: [-roomSize/4 - openingSize/4, ceilingY, 0]
+            }
+        ];
         
-        // South section - WITH HOLES FOR SW AND SE STAIRS
-        this.createSouthCeilingWithStairHoles(ceilingMaterial, ceilingY, openingSize, roomSize, tileSize);
+        ceilingSections.forEach(section => {
+            const ceiling = new THREE.Mesh(section.geometry, ceilingMaterial.clone());
+            ceiling.rotation.x = Math.PI / 2;
+            ceiling.position.set(...section.position);
+            
+            const width = section.geometry.parameters.width;
+            const height = section.geometry.parameters.height;
+            ceiling.material.map.repeat.set(width / tileSize, height / tileSize);
+            ceiling.material.map.needsUpdate = true;
+            
+            this.architectureGroup.add(ceiling);
+        });
         
-        // East section (no stairs here)
-        const eastCeiling = new THREE.Mesh(
-            new THREE.PlaneGeometry((roomSize - openingSize) / 2, openingSize),
-            ceilingMaterial.clone()
-        );
-        eastCeiling.rotation.x = Math.PI / 2;
-        eastCeiling.position.set(roomSize/4 + openingSize/4, ceilingY, 0);
-        eastCeiling.material.map.repeat.set(((roomSize - openingSize) / 2) / tileSize, openingSize / tileSize);
-        eastCeiling.material.map.needsUpdate = true;
-        this.architectureGroup.add(eastCeiling);
-        
-        // West section (no stairs here)
-        const westCeiling = new THREE.Mesh(
-            new THREE.PlaneGeometry((roomSize - openingSize) / 2, openingSize),
-            ceilingMaterial.clone()
-        );
-        westCeiling.rotation.x = Math.PI / 2;
-        westCeiling.position.set(-roomSize/4 - openingSize/4, ceilingY, 0);
-        westCeiling.material.map.repeat.set(((roomSize - openingSize) / 2) / tileSize, openingSize / tileSize);
-        westCeiling.material.map.needsUpdate = true;
-        this.architectureGroup.add(westCeiling);
-        
-        console.log('Tiled ceiling with all 4 stair openings created');
-    }
-    
-    createNorthCeilingWithStairHoles(ceilingMaterial, ceilingY, openingSize, roomSize, tileSize) {
-        // North section has stairs at: NW (-350, -350) and NE (350, -350)
-        const northSectionZ = -roomSize/4 - openingSize/4; // -360
-        const sectionWidth = roomSize; // 960
-        const sectionHeight = (roomSize - openingSize) / 2; // 360
-        const holeSize = 100;
-        
-        // NW stair hole at x: -350
-        const nwHoleX = -350;
-        const nwHoleZ = -350;
-        
-        // NE stair hole at x: 350  
-        const neHoleX = 350;
-        const neHoleZ = -350;
-        
-        // Create ceiling pieces - we need 5 pieces to avoid both holes
-        
-        // Far west piece (west of NW hole)
-        const farWestWidth = (sectionWidth/2) + nwHoleX - holeSize/2;
-        if (farWestWidth > 0) {
-            this.createCeilingPiece(ceilingMaterial, farWestWidth, sectionHeight, 
-                                  -sectionWidth/2 + farWestWidth/2, ceilingY, northSectionZ, tileSize);
-        }
-        
-        // Middle piece (between the two holes)
-        const middleWidth = neHoleX - nwHoleX - holeSize;
-        if (middleWidth > 0) {
-            this.createCeilingPiece(ceilingMaterial, middleWidth, sectionHeight,
-                                  (nwHoleX + neHoleX)/2, ceilingY, northSectionZ, tileSize);
-        }
-        
-        // Far east piece (east of NE hole)
-        const farEastWidth = (sectionWidth/2) - neHoleX - holeSize/2;
-        if (farEastWidth > 0) {
-            this.createCeilingPiece(ceilingMaterial, farEastWidth, sectionHeight,
-                                  neHoleX + holeSize/2 + farEastWidth/2, ceilingY, northSectionZ, tileSize);
-        }
-        
-        // North strips above holes (if needed)
-        const northStripHeight = sectionHeight/2 - holeSize/2;
-        if (northStripHeight > 0) {
-            // Above NW hole
-            this.createCeilingPiece(ceilingMaterial, holeSize, northStripHeight,
-                                  nwHoleX, ceilingY, northSectionZ - sectionHeight/2 + northStripHeight/2, tileSize);
-            // Above NE hole  
-            this.createCeilingPiece(ceilingMaterial, holeSize, northStripHeight,
-                                  neHoleX, ceilingY, northSectionZ - sectionHeight/2 + northStripHeight/2, tileSize);
-        }
-        
-        // South strips below holes (if needed)
-        const southStripHeight = sectionHeight/2 - holeSize/2;
-        if (southStripHeight > 0) {
-            // Below NW hole
-            this.createCeilingPiece(ceilingMaterial, holeSize, southStripHeight,
-                                  nwHoleX, ceilingY, northSectionZ + sectionHeight/2 - southStripHeight/2, tileSize);
-            // Below NE hole
-            this.createCeilingPiece(ceilingMaterial, holeSize, southStripHeight,
-                                  neHoleX, ceilingY, northSectionZ + sectionHeight/2 - southStripHeight/2, tileSize);
-        }
-        
-        console.log('Created north ceiling with NW and NE stair holes');
-    }
-    
-    createSouthCeilingWithStairHoles(ceilingMaterial, ceilingY, openingSize, roomSize, tileSize) {
-        // South section now has NO stair holes - create one solid piece
-        const southSectionZ = roomSize/4 + openingSize/4; // 360
-        const sectionWidth = roomSize; // 960
-        const sectionHeight = (roomSize - openingSize) / 2; // 360
-        
-        // Create one solid ceiling piece for entire south section
-        this.createCeilingPiece(ceilingMaterial, sectionWidth, sectionHeight,
-                              0, ceilingY, southSectionZ, tileSize);
-        
-        console.log('Created solid south ceiling (no stair holes)');
-    }
-    
-    createCeilingPiece(material, width, height, x, y, z, tileSize) {
-        if (width <= 0 || height <= 0) return; // Skip invalid pieces
-        
-        const piece = new THREE.Mesh(
-            new THREE.PlaneGeometry(width, height),
-            material.clone()
-        );
-        piece.rotation.x = Math.PI / 2;
-        piece.position.set(x, y, z);
-        piece.material.map.repeat.set(width / tileSize, height / tileSize);
-        piece.material.map.needsUpdate = true;
-        this.architectureGroup.add(piece);
+        console.log('Simple ceiling with central opening created');
     }
     
     createBasicPool() {
-        // Pool that's recessed into the floor
-        
-        // Pool floor (deeper)
+        // Pool floor
         const poolFloor = new THREE.Mesh(
             new THREE.PlaneGeometry(this.poolWidth, this.poolDepth),
             this.materials.pool
@@ -552,49 +466,30 @@ export class PoolroomWorld {
         poolFloor.position.y = -this.poolDepthValue;
         this.poolGroup.add(poolFloor);
         
-        // Pool walls - these go from floor level down to pool floor
+        // Pool walls
         const poolWallHeight = this.poolDepthValue;
         
-        // North pool wall
-        const northPoolWall = new THREE.Mesh(
-            new THREE.PlaneGeometry(this.poolWidth, poolWallHeight),
-            this.materials.pool
-        );
-        northPoolWall.position.set(0, -poolWallHeight/2, -this.poolDepth/2);
-        this.poolGroup.add(northPoolWall);
+        const poolWalls = [
+            { pos: [0, -poolWallHeight/2, -this.poolDepth/2], rot: [0, 0, 0] },
+            { pos: [0, -poolWallHeight/2, this.poolDepth/2], rot: [0, Math.PI, 0] },
+            { pos: [this.poolWidth/2, -poolWallHeight/2, 0], rot: [0, -Math.PI/2, 0] },
+            { pos: [-this.poolWidth/2, -poolWallHeight/2, 0], rot: [0, Math.PI/2, 0] }
+        ];
         
-        // South pool wall
-        const southPoolWall = new THREE.Mesh(
-            new THREE.PlaneGeometry(this.poolWidth, poolWallHeight),
-            this.materials.pool
-        );
-        southPoolWall.position.set(0, -poolWallHeight/2, this.poolDepth/2);
-        southPoolWall.rotation.y = Math.PI;
-        this.poolGroup.add(southPoolWall);
+        poolWalls.forEach(wall => {
+            const poolWall = new THREE.Mesh(
+                new THREE.PlaneGeometry(this.poolWidth, poolWallHeight),
+                this.materials.pool
+            );
+            poolWall.position.set(...wall.pos);
+            poolWall.rotation.set(...wall.rot);
+            this.poolGroup.add(poolWall);
+        });
         
-        // East pool wall
-        const eastPoolWall = new THREE.Mesh(
-            new THREE.PlaneGeometry(this.poolDepth, poolWallHeight),
-            this.materials.pool
-        );
-        eastPoolWall.position.set(this.poolWidth/2, -poolWallHeight/2, 0);
-        eastPoolWall.rotation.y = -Math.PI/2;
-        this.poolGroup.add(eastPoolWall);
-        
-        // West pool wall
-        const westPoolWall = new THREE.Mesh(
-            new THREE.PlaneGeometry(this.poolDepth, poolWallHeight),
-            this.materials.pool
-        );
-        westPoolWall.position.set(-this.poolWidth/2, -poolWallHeight/2, 0);
-        westPoolWall.rotation.y = Math.PI/2;
-        this.poolGroup.add(westPoolWall);
-        
-        // Add pool edge/coping around the rim
+        // Pool edges
         const edgeHeight = 0.2;
         const edgeWidth = 2;
         
-        // Create raised edges around pool at floor level
         const edges = [
             { pos: [0, edgeHeight/2, -this.poolDepth/2 - edgeWidth/2], size: [this.poolWidth + edgeWidth*2, edgeHeight, edgeWidth] },
             { pos: [0, edgeHeight/2, this.poolDepth/2 + edgeWidth/2], size: [this.poolWidth + edgeWidth*2, edgeHeight, edgeWidth] },
@@ -609,18 +504,16 @@ export class PoolroomWorld {
             this.poolGroup.add(edgeMesh);
         });
         
-        console.log('Visible recessed pool created');
+        console.log('Pool created');
     }
     
     createBasicPillars() {
-        // Thicker pillars that go all the way down through the pool
         const pillarRadius = 8;
-        const pillarHeight = this.wallHeight + this.poolDepthValue; // Extend below pool floor
+        const pillarHeight = this.wallHeight + this.poolDepthValue;
         
-        // Pillar positions scaled up for larger room
         const positions = [
-            [-180, 0, -180],  // Was -90, now -180
-            [180, 0, -180],   // Was 90, now 180
+            [-180, 0, -180],
+            [180, 0, -180],
             [-180, 0, 180],
             [180, 0, 180]
         ];
@@ -630,51 +523,43 @@ export class PoolroomWorld {
                 new THREE.CylinderGeometry(pillarRadius, pillarRadius, pillarHeight, 12),
                 this.materials.pillar
             );
-            // Position so pillar goes from pool floor up to ceiling
             pillar.position.set(pos[0], (pillarHeight/2) - this.poolDepthValue, pos[2]);
             this.architectureGroup.add(pillar);
         });
         
-        console.log('Full-height pillars created (floor to ceiling through pool)');
+        console.log('Pillars created');
     }
     
     createWallOpenings() {
-        // Wall openings scaled up for larger room
-        const openingWidth = 80;      // Was 40, now 80
-        const openingSpacing = 160;   // Was 80, now 160
+        const openingWidth = 80;
+        const openingSpacing = 160;
         const wallHeight = this.wallHeight;
         const roomSize = this.roomSize;
         
-        // Material for opening frames
         const frameMaterial = new THREE.MeshLambertMaterial({
             color: 0xc0c0c0
         });
         
-        // Sky material for openings
         const skyMaterial = new THREE.MeshBasicMaterial({
             color: 0x87ceeb,
             transparent: true,
-            opacity: 0.1  // Much more transparent to show skybox behind
+            opacity: 0.1
         });
         
-        // Create openings on each wall
         const wallConfigs = [
-            { wall: 'north', basePos: [0, 0, -roomSize/2 + 2], direction: 'x' },
+            // Skip north wall (has door)
             { wall: 'south', basePos: [0, 0, roomSize/2 - 2], direction: 'x' },
             { wall: 'east', basePos: [roomSize/2 - 2, 0, 0], direction: 'z' },
             { wall: 'west', basePos: [-roomSize/2 + 2, 0, 0], direction: 'z' }
         ];
         
         wallConfigs.forEach(config => {
-            // Create 3 openings per wall
             for (let i = -1; i <= 1; i++) {
                 const openingGroup = new THREE.Group();
                 
-                // Opening frame
                 const frameGeometry = new THREE.PlaneGeometry(openingWidth + 4, wallHeight);
                 const frame = new THREE.Mesh(frameGeometry, frameMaterial);
                 
-                // Sky view through opening
                 const skyGeometry = new THREE.PlaneGeometry(openingWidth, wallHeight);
                 const sky = new THREE.Mesh(skyGeometry, skyMaterial);
                 sky.position.z = 0.1;
@@ -682,7 +567,6 @@ export class PoolroomWorld {
                 openingGroup.add(frame);
                 openingGroup.add(sky);
                 
-                // Position the opening
                 if (config.direction === 'x') {
                     openingGroup.position.set(i * openingSpacing, wallHeight/2, config.basePos[2]);
                     if (config.wall === 'south') openingGroup.rotation.y = Math.PI;
@@ -696,38 +580,25 @@ export class PoolroomWorld {
             }
         });
         
-        console.log('Floor-to-ceiling wall openings created');
+        console.log('Wall openings created');
     }
     
     createBasicSkybox() {
-        // Create a large sphere that surrounds the entire scene
-        const skyboxGeometry = new THREE.SphereGeometry(1500, 32, 32); // Much larger than room
+        const skyboxGeometry = new THREE.SphereGeometry(2000, 32, 32);
         
-        // Create a simple gradient sky material
         const canvas = document.createElement('canvas');
         canvas.width = 512;
         canvas.height = 512;
         const ctx = canvas.getContext('2d');
         
-        // Create vertical gradient from light blue to white
+        // Vaporwave gradient
         const gradient = ctx.createLinearGradient(0, 0, 0, 512);
-        gradient.addColorStop(0, '#87CEEB');    // Sky blue at top
-        gradient.addColorStop(0.7, '#B0E0E6');  // Powder blue
-        gradient.addColorStop(1, '#F0F8FF');    // Alice blue at horizon
+        gradient.addColorStop(0, '#ff69b4');    // Hot pink
+        gradient.addColorStop(0.5, '#9370db');  // Medium purple
+        gradient.addColorStop(1, '#4b0082');    // Indigo
         
         ctx.fillStyle = gradient;
         ctx.fillRect(0, 0, 512, 512);
-        
-        // Add some simple cloud-like texture
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-        for (let i = 0; i < 20; i++) {
-            const x = Math.random() * 512;
-            const y = Math.random() * 256; // Only in upper half
-            const radius = 20 + Math.random() * 40;
-            ctx.beginPath();
-            ctx.arc(x, y, radius, 0, Math.PI * 2);
-            ctx.fill();
-        }
         
         const skyTexture = new THREE.CanvasTexture(canvas);
         skyTexture.wrapS = THREE.RepeatWrapping;
@@ -735,114 +606,375 @@ export class PoolroomWorld {
         
         const skyboxMaterial = new THREE.MeshBasicMaterial({
             map: skyTexture,
-            side: THREE.BackSide, // Render on inside of sphere
-            fog: false // Don't apply fog to skybox
+            side: THREE.BackSide,
+            fog: false
         });
         
         this.skybox = new THREE.Mesh(skyboxGeometry, skyboxMaterial);
-        this.skybox.position.y = 200; // Lift it up a bit
+        this.skybox.position.y = 200;
         
         this.scene.add(this.skybox);
         
-        console.log('🌤️ Basic gradient skybox with clouds created');
+        console.log('🌈 Vaporwave skybox created');
     }
     
-    // ===== NEW: JUST THE STAIRS =====
+    // NEW: Door, walkway, and temple creation methods
     
-    createCornerStaircases() {
-        console.log('🏗️ Creating corner staircases...');
+    createDoor() {
+        console.log('🚪 Creating door...');
         
-        // Only keep north section stairs - remove both south stairs
-        const stairPositions = [
-            { x: -350, z: -350, name: 'northwest' },  // North section has opening
-            { x: 350, z: -350, name: 'northeast' }    // North section has opening
-            // Removed: { x: -350, z: 350, name: 'southwest' }
-            // Removed: { x: 350, z: 350, name: 'southeast' }
-        ];
+        const doorWidth = 80;
+        const doorHeight = 120;
+        const doorThickness = 5;
+        const doorOffset = 0; // CENTER THE DOOR
         
-        stairPositions.forEach(stairPos => {
-            this.createSingleStaircase(stairPos.x, stairPos.z, stairPos.name);
-        });
+        // Door frame
+        const frameGeometry = new THREE.BoxGeometry(doorWidth + 10, doorHeight + 10, doorThickness + 2);
+        const frame = new THREE.Mesh(frameGeometry, this.materials.wall);
+        frame.position.set(doorOffset, doorHeight/2, -this.roomSize/2 + 1);
+        this.architectureGroup.add(frame);
         
-        console.log('✅ Corner staircases created (2 stairs: NW, NE only)');
+        // Door itself
+        const doorGeometry = new THREE.BoxGeometry(doorWidth, doorHeight, doorThickness);
+        const door = new THREE.Mesh(doorGeometry, this.materials.door);
+        door.position.set(doorOffset, doorHeight/2, -this.roomSize/2);
+        this.architectureGroup.add(door);
+        
+        console.log('✅ Door created and centered');
     }
     
-    createSingleStaircase(x, z, name) {
-        const stairGroup = new THREE.Group();
-        stairGroup.name = `staircase-${name}`;
+    createWalkway() {
+        console.log('🛤️ Creating walkway...');
         
-        // Stairs going up to ceiling level
-        const targetHeight = this.wallHeight;  // Just go to ceiling level for now
-        const stepHeight = 8;
-        const stepDepth = 12;
-        const stairWidth = 40;
-        const numSteps = Math.ceil(targetHeight / stepHeight);
+        const walkwayStart = -this.roomSize/2;
+        const walkwayEnd = walkwayStart - this.walkwayLength;
         
-        // Create each step
-        for (let i = 0; i < numSteps; i++) {
-            const stepY = i * stepHeight;
-            
-            // Step geometry - wider for comfort
-            const stepGeometry = new THREE.BoxGeometry(
-                stairWidth, 
-                stepHeight, 
-                stepDepth
-            );
-            
-            const step = new THREE.Mesh(stepGeometry, this.materials.stair);
-            
-            // Position step - NOTE THE ACTUAL POSITIONING
-            step.position.set(
-                x, 
-                stepY + stepHeight/2, 
-                z + (i * stepDepth) - (numSteps * stepDepth / 2)
-            );
-            
-            stairGroup.add(step);
-        }
-        
-        // Add simple railings
-        this.createStairRailings(stairGroup, x, z, numSteps, stepHeight, stepDepth, stairWidth);
-        
-        // Add landing at the top
-        const landingGeometry = new THREE.BoxGeometry(
-            stairWidth + 20, 
-            4, 
-            stairWidth + 20
+        // Walkway floor - CENTERED AT X=0
+        const walkwayFloor = new THREE.Mesh(
+            new THREE.PlaneGeometry(this.walkwayWidth, this.walkwayLength),
+            this.materials.floor
         );
-        const landing = new THREE.Mesh(landingGeometry, this.materials.stair);
-        landing.position.set(x, targetHeight + 2, z);
-        stairGroup.add(landing);
+        walkwayFloor.rotation.x = -Math.PI / 2;
+        walkwayFloor.position.set(0, 0, walkwayStart - this.walkwayLength/2); // X=0 instead of 200
+        this.walkwayGroup.add(walkwayFloor);
         
-        this.stairsGroup.add(stairGroup);
-        console.log(`📐 Created ${name} staircase with ${numSteps} steps`);
-        console.log(`📐 Staircase spans from Z: ${z - (numSteps * stepDepth / 2)} to Z: ${z + (numSteps * stepDepth / 2)}`);
+        // NO WALLS - removed the walkway walls completely
+        
+        console.log('✅ Walkway created (centered, no walls)');
     }
     
-    createStairRailings(stairGroup, x, z, numSteps, stepHeight, stepDepth, stairWidth) {
-        const railHeight = 12;
-        const railWidth = 2;
+    createTempleArea() {
+        console.log('🏛️ Creating refactored Greco-Roman temple complex...');
+        const templeZ = -this.roomSize/2 - this.walkwayLength - this.templeSize/2;
+        // Main temple floor
+        const templeFloor = new THREE.Mesh(
+            new THREE.PlaneGeometry(this.templeSize, this.templeSize),
+            this.materials.temple
+        );
+        templeFloor.rotation.x = -Math.PI / 2;
+        templeFloor.position.set(0, 0, templeZ);
+        this.templeGroup.add(templeFloor);
+
+        // Perimeter walls (with wide north opening)
+        this.createTempleWallsRefactored(templeZ);
+
+        // Main altar (centered)
+        this.createTempleAltar(templeZ);
+
+        // Portal arches to wings
+        this.createPortalArch(-this.templeSize/2 + 10, 0, templeZ, 'west'); // to grotto
+        this.createPortalArch(this.templeSize/2 - 10, 0, templeZ, 'east'); // to gallery
+
+        // Grotto (west wing)
+        this.createTempleGrottoAreaRefactored(templeZ);
+        // Gallery (east wing)
+        this.createArtGalleryWingRefactored(templeZ);
+
+        // Main colonnade around temple
+        this.createMainTempleColumnsRefactored(templeZ);
+
+        // Lighting
+        this.createVaporwaveLighting(templeZ);
+        this.createTorchLights(templeZ);
+
+        // Classic Greek exterior facade (single row colonnade front and back)
+        this.createGreekTempleFacade(templeZ);
+
+        console.log('✅ Refactored temple complex created');
+    }
+
+    createGreekTempleFacade(templeZ) {
+        // Single row of columns at the front (north)
+        const colZFront = templeZ - this.templeSize/2 - 20;
+        for (let x = -440; x <= 440; x += 80) {
+            this.createTempleColumn(x, 0, colZFront);
+        }
+        // Single row of columns at the back (south)
+        const colZBack = templeZ + this.templeSize/2 + 20;
+        for (let x = -440; x <= 440; x += 80) {
+            this.createTempleColumn(x, 0, colZBack);
+        }
+    }
+
+    // New/refactored helpers
+    createTempleWallsRefactored(templeZ) {
+        // No walls: leave the temple open, only columns will define the space
+    }
+
+    createPortalArch(x, y, z, dir) {
+        // Simple archway for portals to wings
+        const arch = new THREE.Mesh(
+            new THREE.TorusGeometry(40, 6, 12, 32, Math.PI),
+            this.materials.temple
+        );
+        arch.position.set(x, 60, z);
+        arch.rotation.z = dir === 'west' ? Math.PI/2 : -Math.PI/2;
+        this.templeGroup.add(arch);
+    }
+
+    createMainTempleColumnsRefactored(templeZ) {
+        // Perimeter colonnade
+        const colDist = this.templeSize/2 - 40;
+        for (let x = -colDist; x <= colDist; x += 100) {
+            this.createTempleColumn(x, 0, templeZ - colDist);
+            this.createTempleColumn(x, 0, templeZ + colDist);
+        }
+        for (let z = -colDist + 100; z <= colDist - 100; z += 100) {
+            this.createTempleColumn(-colDist, 0, templeZ + z);
+            this.createTempleColumn(colDist, 0, templeZ + z);
+        }
+    }
+
+    createTempleGrottoAreaRefactored(templeZ) {
+        // Grotto in west wing, more organic
+        const grottoX = -this.templeSize/2 - 120;
+        const grottoZ = templeZ;
+        // Grotto floor
+        const grottoFloor = new THREE.Mesh(
+            new THREE.CircleGeometry(120, 24),
+            this.materials.vaporwave
+        );
+        grottoFloor.rotation.x = -Math.PI / 2;
+        grottoFloor.position.set(grottoX, -8, grottoZ);
+        this.templeGroup.add(grottoFloor);
+        // Grotto pool (deeper)
+        const grottoPool = new THREE.Mesh(
+            new THREE.CylinderGeometry(60, 60, 24, 24),
+            this.materials.vaporwave
+        );
+        grottoPool.position.set(grottoX, -20, grottoZ);
+        this.templeGroup.add(grottoPool);
+        // Rocks
+        for (let i = 0; i < 10; i++) {
+            const angle = (i / 10) * Math.PI * 2;
+            const r = 90 + Math.random() * 30;
+            const rock = new THREE.Mesh(
+                new THREE.DodecahedronGeometry(10 + Math.random() * 8),
+                this.materials.temple
+            );
+            rock.position.set(
+                grottoX + Math.cos(angle) * r,
+                -2 + Math.random() * 8,
+                grottoZ + Math.sin(angle) * r
+            );
+            this.templeGroup.add(rock);
+        }
+        // Grotto columns
+        for (let i = 0; i < 4; i++) {
+            const angle = (i / 4) * Math.PI * 2;
+            this.createGrottoColumn(
+                grottoX + Math.cos(angle) * 60,
+                0,
+                grottoZ + Math.sin(angle) * 60
+            );
+        }
+    }
+
+    createArtGalleryWingRefactored(templeZ) {
+        // Gallery in east wing
+        const galleryX = this.templeSize/2 + 120;
+        const galleryZ = templeZ;
+        // Gallery floor
+        const galleryFloor = new THREE.Mesh(
+            new THREE.PlaneGeometry(this.artGallerySize, this.artGallerySize),
+            this.materials.floor
+        );
+        galleryFloor.rotation.x = -Math.PI / 2;
+        galleryFloor.position.set(galleryX, 0, galleryZ);
+        this.templeGroup.add(galleryFloor);
+        // (Removed gallery walls)
+        // Art pedestals and pieces
+        for (let i = 0; i < 8; i++) {
+            const pedestal = new THREE.Mesh(
+                new THREE.CylinderGeometry(15, 20, 30, 8),
+                this.materials.temple
+            );
+            pedestal.position.set(
+                galleryX + (i % 4 - 1.5) * 80,
+                15,
+                galleryZ + (Math.floor(i / 4) - 0.5) * 120
+            );
+            this.templeGroup.add(pedestal);
+            const artPiece = new THREE.Mesh(
+                new THREE.BoxGeometry(20, 25, 20),
+                this.materials.vaporwave
+            );
+            artPiece.position.set(
+                galleryX + (i % 4 - 1.5) * 80,
+                42,
+                galleryZ + (Math.floor(i / 4) - 0.5) * 120
+            );
+            this.templeGroup.add(artPiece);
+        }
+    }
+
+    createTorchLights(templeZ) {
+        // Torch lights at entrances
+        const torchPositions = [
+            [0, 30, templeZ - this.templeSize/2 + 40], // main entrance
+            [-this.templeSize/2 + 10, 30, templeZ],    // west portal
+            [this.templeSize/2 - 10, 30, templeZ]      // east portal
+        ];
+        torchPositions.forEach(pos => {
+            const torch = new THREE.Mesh(
+                new THREE.SphereGeometry(7, 8, 6),
+                new THREE.MeshBasicMaterial({ color: 0xffa500, emissive: 0xffa500, emissiveIntensity: 1 })
+            );
+            torch.position.set(...pos);
+            this.templeGroup.add(torch);
+        });
+    }
+    
+    createTempleColumn(x, baseY, z) {
+        // Column base
+        const base = new THREE.Mesh(
+            new THREE.CylinderGeometry(8, 10, 6, 8),
+            this.materials.temple
+        );
+        base.position.set(x, baseY + 3, z);
+        this.templeGroup.add(base);
         
-        // Side railings
-        for (let side = -1; side <= 1; side += 2) {
-            const railGeometry = new THREE.BoxGeometry(
-                railWidth, 
-                railHeight, 
-                numSteps * stepDepth
-            );
+        // Column shaft
+        const shaft = new THREE.Mesh(
+            new THREE.CylinderGeometry(6, 6, 40, 8),
+            this.materials.vaporwave
+        );
+        shaft.position.set(x, baseY + 26, z);
+        this.templeGroup.add(shaft);
+        
+        // Column capital
+        const capital = new THREE.Mesh(
+            new THREE.CylinderGeometry(10, 8, 6, 8),
+            this.materials.temple
+        );
+        capital.position.set(x, baseY + 49, z);
+        this.templeGroup.add(capital);
+    }
+    
+    createGrottoColumn(x, baseY, z) {
+        // More organic, twisted column for grotto area
+        const segments = 8;
+        for (let i = 0; i < segments; i++) {
+            const segmentHeight = 6;
+            const twist = (i / segments) * Math.PI * 0.5;
+            const radius = 8 + Math.sin(i * 0.5) * 2;
             
-            const railing = new THREE.Mesh(railGeometry, this.materials.stair);
-            railing.position.set(
-                x + side * (stairWidth/2 + railWidth/2),
-                (numSteps * stepHeight) / 2 + railHeight/2,
-                z
+            const segment = new THREE.Mesh(
+                new THREE.CylinderGeometry(radius, radius + 1, segmentHeight, 8),
+                this.materials.vaporwave
             );
-            
-            stairGroup.add(railing);
+            segment.position.set(
+                x + Math.cos(twist) * 2,
+                baseY + 3 + i * segmentHeight,
+                z + Math.sin(twist) * 2
+            );
+            segment.rotation.y = twist;
+            this.templeGroup.add(segment);
         }
     }
     
-    // Simple getters
+    createVaporwaveLighting(templeZ) {
+        const neonColors = [0xff1493, 0x00ffff, 0xff69b4, 0x9370db, 0x32cd32];
+        
+        // Perimeter accent lights
+        for (let i = 0; i < 16; i++) {
+            const angle = (i / 16) * Math.PI * 2;
+            const radius = 400;
+            const light = new THREE.Mesh(
+                new THREE.SphereGeometry(8, 8, 6),
+                new THREE.MeshBasicMaterial({
+                    color: neonColors[i % neonColors.length],
+                    emissive: neonColors[i % neonColors.length],
+                    emissiveIntensity: 0.6
+                })
+            );
+            light.position.set(
+                Math.cos(angle) * radius,
+                40,
+                templeZ + Math.sin(angle) * radius
+            );
+            this.templeGroup.add(light);
+        }
+        
+        // Central lighting above altar
+        for (let i = 0; i < 5; i++) {
+            const centralLight = new THREE.Mesh(
+                new THREE.SphereGeometry(6, 8, 6),
+                new THREE.MeshBasicMaterial({
+                    color: neonColors[i],
+                    emissive: neonColors[i],
+                    emissiveIntensity: 0.8
+                })
+            );
+            centralLight.position.set(
+                (i - 2) * 20,
+                80,
+                templeZ
+            );
+            this.templeGroup.add(centralLight);
+        }
+    }
+    
+    createTempleAltar(templeZ) {
+        // Central raised altar area
+        const altarPlatform = new THREE.Mesh(
+            new THREE.CylinderGeometry(80, 90, 8, 12),
+            this.materials.temple
+        );
+        altarPlatform.position.set(0, 4, templeZ);
+        this.templeGroup.add(altarPlatform);
+        
+        // Altar itself
+        const altar = new THREE.Mesh(
+            new THREE.BoxGeometry(40, 20, 20),
+            this.materials.vaporwave
+        );
+        altar.position.set(0, 18, templeZ);
+        this.templeGroup.add(altar);
+        
+        // Decorative braziers around altar
+        for (let i = 0; i < 6; i++) {
+            const angle = (i / 6) * Math.PI * 2;
+            const radius = 60;
+            const brazier = new THREE.Mesh(
+                new THREE.CylinderGeometry(8, 12, 20, 8),
+                this.materials.vaporwave
+            );
+            brazier.position.set(
+                Math.cos(angle) * radius,
+                10,
+                templeZ + Math.sin(angle) * radius
+            );
+            this.templeGroup.add(brazier);
+        }
+    }
+    
+    createGrottoPool() {
+        // This is now handled in createTempleGrottoArea()
+        console.log('✅ Grotto pool integrated into temple complex');
+    }
+    
+    // Utility methods
     getPoolBounds() {
         return {
             width: this.poolWidth,
@@ -859,22 +991,24 @@ export class PoolroomWorld {
         };
     }
     
-    // NEW: Utility methods for stairs
-    getStaircasePositions() {
-        // Return only the 2 stairs that actually exist
-        return [
-            { x: -350, z: -350, name: 'northwest' },
-            { x: 350, z: -350, name: 'northeast' }
-            // Removed southwest and southeast staircases
-        ];
+    getWalkwayBounds() {
+        return {
+            x: 0,        // CENTERED
+            startZ: -this.roomSize/2,
+            endZ: -this.roomSize/2 - this.walkwayLength,
+            width: this.walkwayWidth
+        };
     }
     
-    isNearStaircase(position, threshold = 50) {
-        const stairs = this.getStaircasePositions();
-        return stairs.some(stair => {
-            const dx = position.x - stair.x;
-            const dz = position.z - stair.z;
-            return Math.sqrt(dx*dx + dz*dz) < threshold;
-        });
+    getTempleBounds() {
+        const templeZ = -this.roomSize/2 - this.walkwayLength - this.templeSize/2;
+        return {
+            x: 0,        // CENTERED
+            z: templeZ,
+            size: this.templeSize,
+            grottoX: 0,  // CENTERED
+            grottoZ: templeZ,
+            grottoSize: this.grottoPoolSize
+        };
     }
 }

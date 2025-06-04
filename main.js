@@ -152,7 +152,7 @@ class PoolroomsApp {
     updateUI() {
         const pos = this.camera.position;
         // Updated bounds for the larger pool
-        const isInWater = pos.y < 0 && Math.abs(pos.x) < 200 && Math.abs(pos.z) < 200;
+        const isInWater = pos.y < 0 && Math.abs(pos.x) < 240 && Math.abs(pos.z) < 240;
         const isPointerLocked = this.cameraControls ? this.cameraControls.isPointerLocked : false;
         
         document.getElementById('status').innerHTML = `
