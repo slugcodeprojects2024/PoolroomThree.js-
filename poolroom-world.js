@@ -109,6 +109,36 @@ export class PoolroomWorld {
                 );
             });
             
+            // Load temple_floor.png
+            this.textures.templeFloor = await new Promise((resolve, reject) => {
+                this.textureLoader.load(
+                    'textures/temple_floor.png',
+                    (texture) => { resolve(texture); },
+                    undefined,
+                    (error) => { reject(error); }
+                );
+            });
+            
+            // Load wood.jpg
+            this.textures.wood = await new Promise((resolve, reject) => {
+                this.textureLoader.load(
+                    'textures/wood.jpg',
+                    (texture) => { resolve(texture); },
+                    undefined,
+                    (error) => { reject(error); }
+                );
+            });
+            
+            // Load stone.jpg
+            this.textures.stone = await new Promise((resolve, reject) => {
+                this.textureLoader.load(
+                    'textures/stone.jpg',
+                    (texture) => { resolve(texture); },
+                    undefined,
+                    (error) => { reject(error); }
+                );
+            });
+            
             Object.values(this.textures).forEach(texture => {
                 texture.wrapS = THREE.RepeatWrapping;
                 texture.wrapT = THREE.RepeatWrapping;
@@ -232,6 +262,21 @@ export class PoolroomWorld {
                 door: new THREE.MeshPhongMaterial({
                     color: 0x8b4513,
                     shininess: 20,
+                    side: THREE.DoubleSide
+                }),
+                templeFloor: new THREE.MeshPhongMaterial({
+                    map: this.textures.templeFloor,
+                    shininess: 40,
+                    side: THREE.DoubleSide
+                }),
+                grottoWood: new THREE.MeshPhongMaterial({
+                    map: this.textures.wood,
+                    shininess: 20,
+                    side: THREE.DoubleSide
+                }),
+                stoneColumn: new THREE.MeshPhongMaterial({
+                    map: this.textures.stone,
+                    shininess: 30,
                     side: THREE.DoubleSide
                 })
             };
@@ -825,7 +870,7 @@ export class PoolroomWorld {
         // Main temple floor
         const templeFloor = new THREE.Mesh(
             new THREE.PlaneGeometry(this.templeSize, this.templeSize),
-            this.materials.temple
+            this.materials.templeFloor
         );
         templeFloor.rotation.x = -Math.PI / 2;
         templeFloor.position.set(0, 0, templeZ);
@@ -947,11 +992,101 @@ export class PoolroomWorld {
         // Gallery floor
         const galleryFloor = new THREE.Mesh(
             new THREE.PlaneGeometry(this.artGallerySize, this.artGallerySize),
-            this.materials.floor
+            new THREE.MeshPhongMaterial({ color: 0xffffff, shininess: 100, reflectivity: 0.5 })
         );
         galleryFloor.rotation.x = -Math.PI / 2;
         galleryFloor.position.set(galleryX, 0, galleryZ);
+        galleryFloor.receiveShadow = true;
         this.templeGroup.add(galleryFloor);
+
+        // Add a reflective ground plane (if Reflector is available)
+        if (typeof THREE.Reflector !== 'undefined') {
+            const reflector = new THREE.Reflector(
+                new THREE.PlaneGeometry(this.artGallerySize, this.artGallerySize),
+                {
+                    color: 0x888888,
+                    textureWidth: 1024,
+                    textureHeight: 1024,
+                    clipBias: 0.003,
+                    recursion: 1
+                }
+            );
+            reflector.rotation.x = -Math.PI / 2;
+            reflector.position.set(galleryX, 0.01, galleryZ);
+            this.templeGroup.add(reflector);
+        }
+
+        // Add geometric shapes in a row, spaced apart
+        const y = 40; // Height for all shapes
+        const spacing = 70;
+        // Cylinder
+        this.galleryCylinder = new THREE.Mesh(
+            new THREE.CylinderGeometry(25, 25, 80, 32),
+            new THREE.MeshPhongMaterial({ color: 0x4B9CD3 }) // Blue
+        );
+        this.galleryCylinder.position.set(galleryX - spacing * 1.5, y, galleryZ);
+        this.galleryCylinder.castShadow = true;
+        this.templeGroup.add(this.galleryCylinder);
+        // Sphere
+        this.gallerySphere = new THREE.Mesh(
+            new THREE.SphereGeometry(32, 32, 32),
+            new THREE.MeshPhongMaterial({ color: 0xE94F37 }) // Red-Orange
+        );
+        this.gallerySphere.position.set(galleryX - spacing * 0.5, y + 8, galleryZ);
+        this.gallerySphere.castShadow = true;
+        this.templeGroup.add(this.gallerySphere);
+        // Cube
+        this.galleryCube = new THREE.Mesh(
+            new THREE.BoxGeometry(60, 60, 60),
+            new THREE.MeshPhongMaterial({ color: 0x43B047 }) // Green
+        );
+        this.galleryCube.position.set(galleryX + spacing * 0.7, y + 10, galleryZ);
+        this.galleryCube.castShadow = true;
+        this.templeGroup.add(this.galleryCube);
+        // Cone (for triangle)
+        this.galleryCone = new THREE.Mesh(
+            new THREE.ConeGeometry(30, 90, 32),
+            new THREE.MeshPhongMaterial({ color: 0xF7C948 }) // Yellow
+        );
+        this.galleryCone.position.set(galleryX + spacing * 1.8, y + 15, galleryZ);
+        this.galleryCone.castShadow = true;
+        this.templeGroup.add(this.galleryCone);
+    }
+
+    // Animate the art gallery shapes
+    updateAnimatedShapes(deltaTime) {
+        if (this.galleryCylinder) this.galleryCylinder.rotation.y += 0.3 * deltaTime;
+        if (this.gallerySphere) this.gallerySphere.rotation.x += 0.4 * deltaTime;
+        if (this.galleryCube) this.galleryCube.rotation.y += 0.5 * deltaTime;
+        if (this.galleryCone) this.galleryCone.rotation.y += 0.2 * deltaTime;
+    }
+
+    // Add a sun mesh and a directional light
+    addSunAndLight() {
+        // Sun position in the sky
+        const sunPos = new THREE.Vector3(0, 1200, -1200);
+        // Sun mesh
+        const sun = new THREE.Mesh(
+            new THREE.SphereGeometry(120, 32, 32),
+            new THREE.MeshBasicMaterial({ color: 0xFFFACD, emissive: 0xFFFF99 }) // Bright yellow/white
+        );
+        sun.position.copy(sunPos);
+        this.scene.add(sun);
+        // Directional light
+        const sunlight = new THREE.DirectionalLight(0xffffff, 1.2);
+        sunlight.position.copy(sunPos);
+        sunlight.target.position.set(0, 0, 0);
+        sunlight.castShadow = true;
+        sunlight.shadow.mapSize.width = 2048;
+        sunlight.shadow.mapSize.height = 2048;
+        sunlight.shadow.camera.near = 0.1;
+        sunlight.shadow.camera.far = 3000;
+        sunlight.shadow.camera.left = -2000;
+        sunlight.shadow.camera.right = 2000;
+        sunlight.shadow.camera.top = 2000;
+        sunlight.shadow.camera.bottom = -2000;
+        this.scene.add(sunlight);
+        this.scene.add(sunlight.target);
     }
 
     createTorchLights(templeZ) {
@@ -962,23 +1097,21 @@ export class PoolroomWorld {
         // Column base
         const base = new THREE.Mesh(
             new THREE.CylinderGeometry(8, 10, 6, 8),
-            this.materials.temple
+            this.materials.stoneColumn ? this.materials.stoneColumn : this.materials.temple
         );
         base.position.set(x, baseY + 3, z);
         this.templeGroup.add(base);
-        
         // Column shaft
         const shaft = new THREE.Mesh(
             new THREE.CylinderGeometry(6, 6, 40, 8),
-            this.materials.vaporwave
+            this.materials.stoneColumn ? this.materials.stoneColumn : this.materials.vaporwave
         );
         shaft.position.set(x, baseY + 26, z);
         this.templeGroup.add(shaft);
-        
         // Column capital
         const capital = new THREE.Mesh(
             new THREE.CylinderGeometry(10, 8, 6, 8),
-            this.materials.temple
+            this.materials.stoneColumn ? this.materials.stoneColumn : this.materials.temple
         );
         capital.position.set(x, baseY + 49, z);
         this.templeGroup.add(capital);
@@ -991,10 +1124,9 @@ export class PoolroomWorld {
             const segmentHeight = 6;
             const twist = (i / segments) * Math.PI * 0.5;
             const radius = 8 + Math.sin(i * 0.5) * 2;
-            
             const segment = new THREE.Mesh(
                 new THREE.CylinderGeometry(radius, radius + 1, segmentHeight, 8),
-                this.materials.vaporwave
+                this.materials.grottoWood ? this.materials.grottoWood : this.materials.vaporwave
             );
             segment.position.set(
                 x + Math.cos(twist) * 2,

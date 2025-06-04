@@ -32,6 +32,7 @@ class PoolroomsApp {
             // Create world
             this.poolroomWorld = new PoolroomWorld(this.scene);
             await this.poolroomWorld.init();
+            this.poolroomWorld.addSunAndLight();
             
             // Setup camera controls
             this.cameraControls = new CameraControls(
@@ -145,6 +146,11 @@ class PoolroomsApp {
         
         if (this.collectiblesManager) {
             this.collectiblesManager.update(deltaTime, this.camera.position);
+        }
+        
+        // Animate art gallery shapes
+        if (this.poolroomWorld && this.poolroomWorld.updateAnimatedShapes) {
+            this.poolroomWorld.updateAnimatedShapes(deltaTime);
         }
         
         // Update UI
