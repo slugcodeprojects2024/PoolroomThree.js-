@@ -4,6 +4,7 @@ import { CameraControls } from './camera-controls.js';
 import { PoolroomWorld } from './poolroom-world.js';
 import { WaterSystem } from './water-system.js';
 import { CollectiblesManager } from './collectibles-manager.js';
+import { GoldfishSystem } from './goldfish-system.js';
 
 class PoolroomsApp {
     constructor() {
@@ -18,6 +19,7 @@ class PoolroomsApp {
         this.poolroomWorld = null;
         this.waterSystem = null;
         this.collectiblesManager = null;
+        this.goldfishSystem = null;
         
         // State
         this.isInitialized = false;
@@ -51,9 +53,12 @@ class PoolroomsApp {
             // Initialize collectibles
             this.collectiblesManager = new CollectiblesManager(this.scene);
             this.collectiblesManager.init();
+
+            // Setup lighting controls
+            this.setupLightingControls();
             
-            // Setup lighting
-            this.setupLighting();
+            // After poolroomWorld is created and pool is initialized
+            this.goldfishSystem = new GoldfishSystem(this.scene, this.poolroomWorld.getPoolBounds(), 8);
             
             // Start render loop
             this.animate();
@@ -84,7 +89,7 @@ class PoolroomsApp {
             2000
         );
         // Start ABOVE GROUND at edge of pool area with good view
-        this.camera.position.set(0, 15, 250); // x=0 (center), y=15 (above floor), z=250 (back from pool)
+        this.camera.position.set(0, 50, 250); // x=0 (center), y=30 (higher above floor), z=250 (back from pool)
         
         // Create renderer
         this.renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -103,30 +108,6 @@ class PoolroomsApp {
         window.addEventListener('resize', () => this.onWindowResize(), false);
         
         console.log('🎮 Three.js core initialized with fixed camera position');
-    }
-    
-    setupLighting() {
-        // Much dimmer lighting to see tile details
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.2); // Very low ambient
-        this.scene.add(ambientLight);
-        
-        // Single directional light - much dimmer
-        const mainLight = new THREE.DirectionalLight(0xffffff, 0.4); // Much lower
-        mainLight.position.set(0, 100, 0);
-        mainLight.castShadow = true;
-        mainLight.shadow.mapSize.width = 2048;
-        mainLight.shadow.mapSize.height = 2048;
-        mainLight.shadow.camera.near = 0.1;
-        mainLight.shadow.camera.far = 200;
-        mainLight.shadow.camera.left = -300;
-        mainLight.shadow.camera.right = 300;
-        mainLight.shadow.camera.top = 300;
-        mainLight.shadow.camera.bottom = -300;
-        this.scene.add(mainLight);
-        
-        // Remove all other lights for now to see the tiles clearly
-        
-        console.log('💡 Minimal lighting for tile visibility');
     }
     
     animate() {
@@ -154,6 +135,14 @@ class PoolroomsApp {
             this.poolroomWorld.updateAnimatedShapes(deltaTime);
         }
         
+        // Update SpotLightHelper every frame
+        if (this.poolroomWorld && this.poolroomWorld.updatePoolSpotLightHelper) {
+            this.poolroomWorld.updatePoolSpotLightHelper();
+        }
+        
+        // Update goldfish system
+        if (this.goldfishSystem) this.goldfishSystem.update(deltaTime);
+        
         // Update UI
         this.updateUI();
         
@@ -162,25 +151,23 @@ class PoolroomsApp {
     }
     
     updateUI() {
-        const pos = this.camera.position;
-        // Updated bounds for the larger pool
-        const isInWater = pos.y < 0 && Math.abs(pos.x) < 240 && Math.abs(pos.z) < 240;
-        const isPointerLocked = this.cameraControls ? this.cameraControls.isPointerLocked : false;
-        
-        document.getElementById('status').innerHTML = `
-            <strong>Position:</strong> ${pos.x.toFixed(1)}, ${pos.y.toFixed(1)}, ${pos.z.toFixed(1)}<br>
-            <strong>Environment:</strong> ${isInWater ? '🏊‍♂️ Swimming in Pool' : '🚶‍♂️ Walking on Deck'}<br>
-            <strong>Pointer Lock:</strong> ${isPointerLocked ? '🔒 Locked' : '🔓 Unlocked (click to lock)'}<br>
-            <strong>Phase 1:</strong> ✅ Basic Architecture Complete
-        `;
-        
-        // Update collectibles counter
+        // Removed status and environment UI update since #status no longer exists
+        // Only update collectibles counter
         if (this.collectiblesManager) {
             const collected = this.collectiblesManager.getCollectedCount();
             const total = this.collectiblesManager.getTotalCount();
             document.getElementById('collectibles-counter').textContent = 
                 `Collectibles: ${collected}/${total}`;
         }
+        // Underwater overlay
+        const overlay = document.getElementById('underwater-overlay');
+        let isUnderwater = false;
+        if (this.cameraControls && typeof this.cameraControls.isInWater === 'function') {
+            isUnderwater = this.cameraControls.isInWater();
+        } else if (this.camera) {
+            isUnderwater = this.camera.position.y < -0.5;
+        }
+        overlay.style.display = isUnderwater ? 'block' : 'none';
     }
     
     onWindowResize() {
@@ -193,6 +180,31 @@ class PoolroomsApp {
     getCamera() { return this.camera; }
     getScene() { return this.scene; }
     getRenderer() { return this.renderer; }
+
+    setupLightingControls() {
+        const ambientSlider = document.getElementById('ambient-slider');
+        const sunSlider = document.getElementById('sun-slider');
+        const ambientValue = document.getElementById('ambient-value');
+        const sunValue = document.getElementById('sun-value');
+        // Ambient
+        if (ambientSlider && ambientValue && this.poolroomWorld.ambientLight) {
+            ambientSlider.value = this.poolroomWorld.ambientLight.intensity;
+            ambientValue.textContent = this.poolroomWorld.ambientLight.intensity.toFixed(2);
+            ambientSlider.addEventListener('input', () => {
+                this.poolroomWorld.ambientLight.intensity = parseFloat(ambientSlider.value);
+                ambientValue.textContent = ambientSlider.value;
+            });
+        }
+        // Sun
+        if (sunSlider && sunValue && this.poolroomWorld.sunLight) {
+            sunSlider.value = this.poolroomWorld.sunLight.intensity;
+            sunValue.textContent = this.poolroomWorld.sunLight.intensity.toFixed(2);
+            sunSlider.addEventListener('input', () => {
+                this.poolroomWorld.sunLight.intensity = parseFloat(sunSlider.value);
+                sunValue.textContent = sunSlider.value;
+            });
+        }
+    }
 }
 
 // Initialize application when page loads

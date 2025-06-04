@@ -98,22 +98,21 @@
     
     <div id="crosshair"></div>
     
-    <div id="ui-overlay">
-        <h3 style="margin-top: 0; color: #00ffff;">🏊‍♂️ Poolrooms - Phase 1</h3>
-        <div id="status">Initializing...</div>
-        <hr style="margin: 10px 0; border: 1px solid #333;">
-        <div style="font-size: 12px; color: #ccc;">
-            <strong>Controls:</strong><br>
-            • WASD - Move<br>
-            • Mouse - Look around<br>
-            • Click to lock cursor<br>
-            • ESC to unlock cursor
-        </div>
-    </div>
-
     <div id="collectibles-ui">
         <div id="collectibles-counter">Collectibles: 0/10</div>
     </div>
+
+    <div id="lighting-controls" style="position: absolute; top: 10px; left: 10px; background: rgba(255,255,255,0.8); padding: 10px; border-radius: 8px; z-index: 10;">
+      <label for="ambient-slider">Ambient Light:</label>
+      <input type="range" id="ambient-slider" min="0" max="2" step="0.01" value="0.35">
+      <span id="ambient-value">0.35</span><br>
+      <label for="sun-slider">Sun Light:</label>
+      <input type="range" id="sun-slider" min="0" max="5" step="0.01" value="2.0">
+      <span id="sun-value">2.0</span><br>
+    </div>
+
+    <!-- Underwater overlay (hidden by default) -->
+    <div id="underwater-overlay" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(30,120,200,0.25); pointer-events: none; z-index: 9998; display: none;"></div>
 
     <!-- Import maps for Three.js modules -->
     <script type="importmap">
@@ -127,5 +126,29 @@
     
     <!-- Load our modular components -->
     <script type="module" src="main.js"></script>
+
+    <!-- Play Music Button Overlay -->
+    <div id="play-music-overlay" style="position:fixed;top:0;left:0;width:100vw;height:100vh;display:flex;align-items:center;justify-content:center;z-index:9999;background:rgba(0,0,0,0.7);">
+      <button id="play-music-btn" style="font-size:2rem;padding:1em 2em;border-radius:12px;border:none;background:#fff;color:#222;box-shadow:0 2px 12px #0008;cursor:pointer;">▶️ Play Music</button>
+    </div>
+    <script>
+      const playOverlay = document.getElementById('play-music-overlay');
+      const playBtn = document.getElementById('play-music-btn');
+      playBtn.addEventListener('click', () => {
+        // Create and add the hidden YouTube iframe
+        if (!document.getElementById('yt-music')) {
+          const yt = document.createElement('iframe');
+          yt.id = 'yt-music';
+          yt.width = 0;
+          yt.height = 0;
+          yt.style.display = 'none';
+          yt.src = 'https://www.youtube.com/embed/w0PkUdrSUTI?autoplay=1&loop=1&playlist=w0PkUdrSUTI';
+          yt.allow = 'autoplay; encrypted-media';
+          yt.frameBorder = '0';
+          document.body.appendChild(yt);
+        }
+        playOverlay.style.display = 'none';
+      });
+    </script>
 </body>
 </html>

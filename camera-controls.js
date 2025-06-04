@@ -19,7 +19,7 @@ export class CameraControls {
         // Physics
         this.velocity = new THREE.Vector3();
         this.direction = new THREE.Vector3();
-        this.walkSpeed = 4000.0;
+        this.walkSpeed = 400.0;
         this.swimSpeed = 200.0;
         this.jumpVelocity = 350;
         this.gravity = 9.8 * 100.0;
@@ -35,7 +35,7 @@ export class CameraControls {
         this.roomBoundary = 460;
         this.poolBoundary = 240;
         this.poolDepth = -18;
-        this.floorLevel = 5;
+        this.floorLevel = 20;
         this.waterLevel = -1;
         this.grottoWaterLevel = -6;
         
@@ -96,7 +96,7 @@ export class CameraControls {
             
             // Update camera rotation
             this.camera.rotation.y -= movementX * this.mouseSensitivity;
-            this.camera.rotation.x -= movementY * this.mouseSensitivity;
+            this.camera.rotation.x += movementY * this.mouseSensitivity;
             
             // Limit vertical rotation
             this.camera.rotation.x = Math.max(
@@ -122,13 +122,21 @@ export class CameraControls {
                 case 'KeyD':
                     this.moveRight = true;
                     break;
+                case 'KeyQ':
+                    // Rotate camera left
+                    this.camera.rotation.y += 0.1;
+                    break;
+                case 'KeyE':
+                    // Rotate camera right
+                    this.camera.rotation.y -= 0.1;
+                    break;
                 case 'Space':
                     event.preventDefault();
                     this.handleJump();
                     break;
                 case 'ShiftLeft':
-                    this.walkSpeed = 600.0;
-                    this.swimSpeed = 300.0;
+                    this.walkSpeed = 800.0;
+                    this.swimSpeed = 400.0;
                     break;
             }
         });
