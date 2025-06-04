@@ -1,9 +1,10 @@
 // camera-controls.js - Single Story Design
 export class CameraControls {
-    constructor(camera, domElement, poolBottomMesh) {
+    constructor(camera, domElement, poolBottomMesh, invisibleWalls = []) {
         this.camera = camera;
         this.domElement = domElement;
         this.poolBottomMesh = poolBottomMesh;
+        this.invisibleWalls = invisibleWalls;
         
         // Movement state
         this.moveForward = false;
@@ -179,6 +180,31 @@ export class CameraControls {
                 if (this.camera.position.y < hitY + offset) {
                     this.camera.position.y = hitY + offset;
                     this.velocity.y = 0;
+                }
+            }
+        }
+        // --- NEW: Mesh-based collision with invisible walls ---
+        if (this.invisibleWalls && this.invisibleWalls.length > 0) {
+            const cameraBB = new THREE.Box3().setFromCenterAndSize(
+                this.camera.position,
+                new THREE.Vector3(6, 16, 6) // Camera collision box size (tweak as needed)
+            );
+            for (const wall of this.invisibleWalls) {
+                wall.updateMatrixWorld();
+                const wallBB = new THREE.Box3().setFromObject(wall);
+                if (cameraBB.intersectsBox(wallBB)) {
+                    // Simple response: push camera back along the smallest axis
+                    const cam = this.camera.position;
+                    const min = wallBB.min;
+                    const max = wallBB.max;
+                    // Find closest face and push out
+                    if (cam.x < min.x) cam.x = min.x - 3;
+                    if (cam.x > max.x) cam.x = max.x + 3;
+                    if (cam.z < min.z) cam.z = min.z - 3;
+                    if (cam.z > max.z) cam.z = max.z + 3;
+                    if (cam.y < min.y) cam.y = min.y - 3;
+                    if (cam.y > max.y) cam.y = max.y + 3;
+                    this.velocity.set(0, 0, 0);
                 }
             }
         }

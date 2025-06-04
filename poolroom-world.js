@@ -36,7 +36,7 @@ export class PoolroomWorld {
         
         await this.loadTextures();
         this.createTexturedMaterials();
-        this.createBasicSkybox();
+        await this.createBasicSkybox();
         this.createGameWorldBackground();
         
         // Main poolroom
@@ -48,7 +48,7 @@ export class PoolroomWorld {
         this.createWallOpenings();
         
         // NEW: Door, walkway, and temple
-        this.createDoor();
+        // this.createDoor(); // COMMENTED OUT: Door is disabled for now
         this.createWalkway();
         this.createTempleArea();
         this.createGrottoPool();
@@ -124,6 +124,20 @@ export class PoolroomWorld {
             console.warn('⚠️ Could not load textures, using fallback colors:', error);
             this.textures = null;
         }
+    }
+    
+    async createBasicSkybox() {
+        // Use the same sky.png for all 6 faces of the cube skybox
+        const loader = new THREE.CubeTextureLoader();
+        const skyboxTexture = loader.load([
+            'textures/sky.png', // right
+            'textures/sky.png', // left
+            'textures/sky.png', // top
+            'textures/sky.png', // bottom
+            'textures/sky.png', // front
+            'textures/sky.png'  // back
+        ]);
+        this.scene.background = skyboxTexture;
     }
     
     createTexturedMaterials() {
@@ -606,6 +620,7 @@ export class PoolroomWorld {
         
         const wallConfigs = [
             // Skip north wall (has door)
+            // { wall: 'north', basePos: [0, 0, -roomSize/2 + 2], direction: 'x' }, // COMMENTED OUT
             { wall: 'south', basePos: [0, 0, roomSize/2 - 2], direction: 'x' },
             { wall: 'east', basePos: [roomSize/2 - 2, 0, 0], direction: 'z' },
             { wall: 'west', basePos: [-roomSize/2 + 2, 0, 0], direction: 'z' }
@@ -639,28 +654,6 @@ export class PoolroomWorld {
         });
         
         console.log('Wall openings created');
-    }
-    
-    createBasicSkybox() {
-        // Large sphere with a bright sky gradient
-        const skyGeo = new THREE.SphereGeometry(3000, 32, 32);
-        const canvas = document.createElement('canvas');
-        canvas.width = 512;
-        canvas.height = 512;
-        const ctx = canvas.getContext('2d');
-        // Simple vertical gradient: blue sky to white
-        const grad = ctx.createLinearGradient(0, 0, 0, 512);
-        grad.addColorStop(0, '#b3e0ff'); // Light blue
-        grad.addColorStop(1, '#ffffff'); // White
-        ctx.fillStyle = grad;
-        ctx.fillRect(0, 0, 512, 512);
-        const skyTex = new THREE.CanvasTexture(canvas);
-        skyTex.wrapS = THREE.RepeatWrapping;
-        skyTex.wrapT = THREE.RepeatWrapping;
-        const skyMat = new THREE.MeshBasicMaterial({ map: skyTex, side: THREE.BackSide });
-        const skybox = new THREE.Mesh(skyGeo, skyMat);
-        skybox.position.y = 0;
-        this.scene.add(skybox);
     }
     
     createGameWorldBackground() {
@@ -739,6 +732,46 @@ export class PoolroomWorld {
         hotTubWater.rotation.x = -Math.PI / 2;
         hotTubWater.position.set(grottoX, 8, grottoZ);
         this.scene.add(hotTubWater);
+
+        // Add white monoliths (randomly placed, tall and rectangular)
+        const monolithCount = 7;
+        for (let i = 0; i < monolithCount; i++) {
+            const monolith = new THREE.Mesh(
+                new THREE.BoxGeometry(60, 400 + Math.random() * 200, 60),
+                new THREE.MeshPhongMaterial({ color: 0xffffff, shininess: 120 })
+            );
+            // Place monoliths far from the play area
+            const angle = Math.random() * Math.PI * 2;
+            const radius = 2000 + Math.random() * 1200;
+            monolith.position.set(
+                Math.cos(angle) * radius,
+                200,
+                Math.sin(angle) * radius
+            );
+            this.scene.add(monolith);
+        }
+
+        // Only add invisible walls for poolroom east and west sides
+        this.invisibleWalls = [];
+        const wallMaterial = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0 });
+        const wallHeight = 600;
+        const wallThickness = 20;
+
+        // Add poolroom east wall
+        const poolroomEastWall = new THREE.Mesh(
+            new THREE.BoxGeometry(wallThickness, wallHeight, this.roomSize), wallMaterial
+        );
+        poolroomEastWall.position.set(this.roomSize/2 + 10, wallHeight / 2, 0);
+        this.scene.add(poolroomEastWall);
+        this.invisibleWalls.push(poolroomEastWall);
+
+        // Add poolroom west wall
+        const poolroomWestWall = new THREE.Mesh(
+            new THREE.BoxGeometry(wallThickness, wallHeight, this.roomSize), wallMaterial
+        );
+        poolroomWestWall.position.set(-this.roomSize/2 - 10, wallHeight / 2, 0);
+        this.scene.add(poolroomWestWall);
+        this.invisibleWalls.push(poolroomWestWall);
     }
     
     // NEW: Door, walkway, and temple creation methods

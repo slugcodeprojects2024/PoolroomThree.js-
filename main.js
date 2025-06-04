@@ -34,7 +34,12 @@ class PoolroomsApp {
             await this.poolroomWorld.init();
             
             // Setup camera controls
-            this.cameraControls = new CameraControls(this.camera, this.renderer.domElement, this.poolroomWorld.getPoolBottomMesh());
+            this.cameraControls = new CameraControls(
+                this.camera,
+                this.renderer.domElement,
+                this.poolroomWorld.getPoolBottomMesh(),
+                this.poolroomWorld.invisibleWalls
+            );
             this.cameraControls.init();
             
             // Initialize water system
