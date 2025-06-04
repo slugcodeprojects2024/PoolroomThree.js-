@@ -1,8 +1,9 @@
 // camera-controls.js - Single Story Design
 export class CameraControls {
-    constructor(camera, domElement) {
+    constructor(camera, domElement, poolBottomMesh) {
         this.camera = camera;
         this.domElement = domElement;
+        this.poolBottomMesh = poolBottomMesh;
         
         // Movement state
         this.moveForward = false;
@@ -15,7 +16,7 @@ export class CameraControls {
         // Physics
         this.velocity = new THREE.Vector3();
         this.direction = new THREE.Vector3();
-        this.walkSpeed = 400.0;
+        this.walkSpeed = 4000.0;
         this.swimSpeed = 200.0;
         this.jumpVelocity = 350;
         this.gravity = 9.8 * 100.0;
@@ -53,6 +54,17 @@ export class CameraControls {
             size: 1360, // Expanded: 960 (temple) + 400 margin
             grottoSize: 120
         };
+        
+        // Add key listener for coordinate display
+        document.addEventListener('keydown', (event) => {
+            if (event.key.toLowerCase() === 'c') {
+                console.log('Camera position:', {
+                    x: this.camera.position.x.toFixed(2),
+                    y: this.camera.position.y.toFixed(2),
+                    z: this.camera.position.z.toFixed(2)
+                });
+            }
+        });
     }
     
     init() {
@@ -154,6 +166,22 @@ export class CameraControls {
         this.updateMovement(deltaTime);
         this.handleCollisions();
         this.updateSwimmingState();
+        // Raycast to pool bottom mesh for collision
+        if (this.poolBottomMesh) {
+            const raycaster = new THREE.Raycaster();
+            const origin = this.camera.position.clone();
+            origin.y += 1; // Start ray just above camera
+            raycaster.set(origin, new THREE.Vector3(0, -1, 0));
+            const intersects = raycaster.intersectObject(this.poolBottomMesh);
+            if (intersects.length > 0) {
+                const hitY = intersects[0].point.y;
+                const offset = 2; // Stand slightly above mesh
+                if (this.camera.position.y < hitY + offset) {
+                    this.camera.position.y = hitY + offset;
+                    this.velocity.y = 0;
+                }
+            }
+        }
     }
     
     updateMovement(deltaTime) {
@@ -205,6 +233,16 @@ export class CameraControls {
         
         this.camera.position.add(movement);
         this.camera.position.y += this.velocity.y * deltaTime;
+        // HARD CLAMP for pool bottom immediately after Y update
+        const pos = this.camera.position;
+        const margin = 2;
+        if (Math.abs(pos.x) < this.poolBoundary + margin && Math.abs(pos.z) < this.poolBoundary + margin) {
+            if (pos.y < -18) {
+                console.log('🔵 IMMEDIATE CLAMP: Forcing Y to pool bottom');
+                pos.y = -18;
+                this.velocity.y = 0;
+            }
+        }
     }
     
     handleCollisions() {
@@ -243,16 +281,14 @@ export class CameraControls {
     
     handleMainRoomCollisions() {
         const pos = this.camera.position;
-        
         // Room boundary collision
         if (pos.x > this.roomBoundary) pos.x = this.roomBoundary;
         if (pos.x < -this.roomBoundary) pos.x = -this.roomBoundary;
         if (pos.z > this.roomBoundary) pos.z = this.roomBoundary;
         if (pos.z < -this.roomBoundary) pos.z = -this.roomBoundary;
-        
-        // Check if in main pool area
-        const inPoolArea = Math.abs(pos.x) < this.poolBoundary && Math.abs(pos.z) < this.poolBoundary;
-        
+        // Check if in main pool area (add margin)
+        const margin = 2;
+        const inPoolArea = Math.abs(pos.x) < this.poolBoundary + margin && Math.abs(pos.z) < this.poolBoundary + margin;
         if (inPoolArea) {
             this.handlePoolCollisions();
         } else {
@@ -309,10 +345,11 @@ export class CameraControls {
     
     handlePoolCollisions() {
         const pos = this.camera.position;
-        
-        // Pool bottom collision
-        if (pos.y < this.poolDepth) {
-            pos.y = this.poolDepth;
+        // Pool bottom collision (use y = -18 to match pool mesh)
+        const poolBottomY = -18;
+        if (pos.y <= poolBottomY) {
+            console.log('🟢 handlePoolCollisions: setting Y to pool bottom');
+            pos.y = poolBottomY;
             this.velocity.y = 0;
             this.canJump = true;
         }
